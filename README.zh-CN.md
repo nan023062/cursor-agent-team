@@ -22,7 +22,7 @@
 
 ```bash
 # 将团队目录复制到你的项目
-cp -r gamedev/ /你的项目/.cursor/gamedev/
+git clone <repo-url> /你的项目/.cursor/gamedev/
 ```
 
 完事。无依赖，无构建。

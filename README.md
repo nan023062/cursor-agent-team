@@ -22,7 +22,7 @@ A portable, self-evolving AI team framework for [Cursor IDE](https://cursor.com)
 
 ```bash
 # Copy the team directory into your project
-cp -r gamedev/ /path/to/your/project/.cursor/gamedev/
+git clone <repo-url> /path/to/your/project/.cursor/gamedev/
 ```
 
 That's it. No dependencies, no build step.
