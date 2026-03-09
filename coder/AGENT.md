@@ -93,6 +93,7 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 | 文件 | 时机 | 目的 |
 |------|------|------|
 | `coder-rules.mdc` | 必读（首次） | 获取管辖路径、架构图、协作路径 |
+|| coder/.dna/cross-assembly-patterns.md | 必读（若文件非空） | 获取已知的跨程序集高频陷阱，避免重蹈跨集共性问题 |
 | `architecture.md` | 必读 | 理解定位、边界、核心模型 |
 | `pitfalls.md` | 必读 | 避免重蹈覆辙 |
 | `dependencies.md` | 必读 | 了解允许引用的依赖 |
@@ -177,7 +178,7 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 | 需求涉及多步骤 | 分解任务（详见 `protocols/task-decomposition.md`），写 `wip.md` | 实现前 |
 | 设计决策 / 边界 / 核心模型变更 | 先更新 `architecture.md` | 实现前 |
 | 引入新依赖 | 先更新 `dependencies.md` | 实现前 |
-| 修 Bug 或踩坑 | 追加 `pitfalls.md`（结构化格式，含标签） | 实现后 |
+| 修 Bug 或踩坑 | 追加 pitfalls.md（结构化格式，含标签）；同步追加一行到 coder/pitfall-index.md（日期\|标签\|程序集\|摘要）；若同标签在 ≥2 个其他程序集出现，写入/更新 coder/.dna/cross-assembly-patterns.md | 实现后 |
 | 公共 API 变更 | 同步 README 中英文 | 实现后 |
 | 跨程序集需求 | 进入「跨程序集协同」流程 | 实现前 |
 | 性能问题（超预算/卡顿/GC 峰值） | 进入「性能优化协议」（见 `protocols/performance-optimization.md`） | 实现前 |
@@ -325,6 +326,16 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 
 ### 维护步骤
 
+0. **Transcript 挖掘**（新增信号采集）— 在读取 `.dna/` 文件之前，先从对话历史中挖掘尚未被记录的踩坑信号：
+   1. 运行 `python .cursor/gamedev/coder/scripts/extract_pitfalls.py`（增量模式，自动跳过已扫描的 transcript）
+   2. 打开生成的报告：`.cursor/gamedev/coder/reports/YYYY-MM-DD-pitfall-candidates.md`
+   3. 逐条评估候选信号：
+      - 确认有价值的条目 → 复制到对应程序集的 `.dna/pitfalls.md`，补写根因和修复字段
+      - 噪声条目 → 直接跳过（不删除报告，留作记录）
+   4. 如果 transcript 目录不存在或脚本报错 → 跳过此步骤，继续步骤 1
+
+   > **意义**：补捞非 `@coder` 上下文中产生的踩坑（如日常对话中的 AI 自我纠正、工具失败、用户明确指出的问题）。
+
 1. **采集** — 扫描当前批次程序集的 `.dna/pitfalls.md` 和 `.dna/changelog.md`；检查每个 `architecture.md` 的 `last_verified` 字段，超过 30 天未验证的标记为 ⚠️ 过期
 2. **去重压缩** — 合并重复条目、精简冗长条目，展示对比后确认
 3. **模式识别** — 按标签统计频率，找出高频教训（>= 3 次）和跨程序集共性
@@ -353,8 +364,10 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 ### 成长闭环
 
 ```
-日常操作 → 踩坑记录到 pitfalls.md
-→ @coder evolution → 识别高频模式（≥3 次同类）
+日常操作 → 踩坑记录到 pitfalls.md（显式路径）
+对话缓存 → Transcript 挖掘（隐式路径，补捞漏网信号）
+           ↓
+@coder evolution → 识别高频模式（≥3 次同类）
 → 升格为 architecture.md 的约束
 → 下次操作读到进化后的规则 → 循环
 ```

@@ -69,10 +69,10 @@
 ```
 coder/
 ├── AGENT.md                    # 智能体定义（三阶段 SOP + 流程控制协议）
-├── .dna/
 ├── README.md                   # 本文件
 ├── .dna/                       # 智能体自身摩擦记录
 │   └── pitfalls.md
+│   ├── cross-assembly-patterns.md  #   跨程序集高频陷阱聚合（实时冒泡）
 ├── protocols/                  # 流程协议
 │   ├── task-decomposition.md
 │   ├── cross-assembly.md
@@ -80,6 +80,9 @@ coder/
 │   ├── strangler-migration.md
 │   ├── code-review.md
 │   └── performance-optimization.md
+├── scripts/                    # 工具脚本
+│   └── extract_pitfalls.py     #   Transcript 挖掘：从对话缓存提取 pitfall 候选
+├── pitfall-index.md              # 跨程序集 pitfall 全局索引（追加专用，内联检测用）
 ├── templates/                  # 初始化模板
 │   ├── dna/                    # .dna/ 文件模板
 │   │   ├── architecture.md
@@ -91,7 +94,7 @@ coder/
 │   ├── health-audit.md
 │   ├── readme.md
 │   └── readme-en.md
-└── reports/                    # 分析报告
+└── reports/                    # 分析报告（含 pitfall 候选报告）
 ```
 
 ## 定位
