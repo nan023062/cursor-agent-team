@@ -12,3 +12,7 @@
 
 | 日期 | 标签 | 程序集 | 摘要 |
 |------|------|--------|------|
+| 2026-03-09 | #memory #performance | PhysicQuery | PhysicStream Grid：体触发后 O(N*R^2) 格子 token 膨胀，AlwaysActive 组应跳过格子注册 |
+| 2026-03-09 | #memory | PhysicQuery | Collision._inGrid：AlwaysActive 动态切换，false->true 时 Remove 被跳过，格子 token 永久残留 |
+| 2026-03-09 | #memory | PhysicQuery | PhysicQuery._assignLongTokens：UnRegisterColliderHotspot 漏掉 Remove，hotspot token 持续泄漏 |
+| 2026-03-09 | #performance #memory | PhysicQuery | 非 AlwaysActive 大体积组无 Range 上限，group 数量暴增时格子仍 O(R^2)，需 MaxRegistrationRadius 兜底 |
