@@ -39,9 +39,11 @@ description: {DESCRIPTION}
 
 ## 管理范围
 
-见 `.cursor/rules/{AGENT_NAME}-rules.mdc`。
+见 `agent-manifest.yaml` 中的 `agents.{AGENT_NAME}.managed_paths`。
 
-> **首次 init**：如果 `.cursor/rules/{AGENT_NAME}-rules.mdc` 不存在，由当前 init 操作自动创建（含管辖路径、架构图、跨智能体协作、约束）。后续 init 新模块时在架构图中注册。
+> **首次 init**：如果 `agent-manifest.yaml` 中未注册本智能体，由当前 init 操作自动添加配置。后续 init 新模块时更新 managed_paths。
+>
+> **IDE 配置**：运行 `python gamedev/adapters/cursor/generate.py` 生成 IDE 特定配置文件。
 
 ---
 
@@ -76,7 +78,7 @@ description: {DESCRIPTION}
 
 | 文件 | 时机 | 目的 |
 |------|------|------|
-| `{AGENT_NAME}-rules.mdc` | 必读 | 获取管辖路径、架构图、协作路径 |
+| `agent-manifest.yaml` | 首次 | 获取管辖路径、协作配置 |
 | `architecture.md` | 必读 | 理解边界、约束、核心模型 |
 | `pitfalls.md` | 必读 | 避免重蹈覆辙 |
 | `dependencies.md` | 必读（如存在） | 了解允许的依赖和契约 |
@@ -117,7 +119,7 @@ description: {DESCRIPTION}
 3. **检查** — {质量检查项}
 4. **收尾**
    - 踩坑写入 `pitfalls.md`，变更写入 `changelog.md`
-   - 如果本次操作新增了模块 → 更新 `.cursor/rules/{AGENT_NAME}-rules.mdc` 的架构图
+   - 如果本次操作新增了模块 → 更新 `agent-manifest.yaml` 的 managed_paths
 
 ---
 
@@ -184,16 +186,24 @@ description: {DESCRIPTION}
 
 ---
 
-## rule 格式
+## IDE 配置
 
-首次 init 时自动创建 `.cursor/rules/{AGENT_NAME}-rules.mdc`，包含：
+智能体定义与 IDE 配置分离：
 
-1. **管辖路径** — 本智能体管理的项目目录
-2. **架构图** — 已 init 模块的依赖树（`*` = 已注册，树从底层到上层）
-3. **跨智能体协作** — 输入/输出路径
-4. **约束** — 核心规则
+1. **可移植层**：`agent-manifest.yaml` + `AGENT.md` + `.dna/`（IDE 无关）
+2. **生成层**：由适配器生成 IDE 特定配置
 
-后续 init 新模块时在架构图中追加注册。
+首次 init 时更新 `agent-manifest.yaml`，然后运行适配器：
+
+```bash
+python gamedev/adapters/cursor/generate.py  # 生成 Cursor 配置
+```
+
+生成的文件包含：
+- `.cursor/rules/{AGENT_NAME}-rules.mdc` — 规则文件
+- `.cursor/commands/{AGENT_NAME}-*.md` — 快捷指令
+
+后续 init 新模块时更新 manifest，重新运行适配器。
 
 ---
 

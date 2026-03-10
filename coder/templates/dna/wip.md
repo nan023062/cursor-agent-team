@@ -1,7 +1,12 @@
+---
+# DNA WIP Template - IDE Agnostic Format
+has_active_tasks: false
+---
+
 # 进行中任务
 
 > 会话开始时检查此文件。有未完成任务时向用户确认：续接 or 放弃。
-> 任务全部完成后清空此文件（保留模板头）。
+> 任务全部完成后清空此文件（保留模板头，将 has_active_tasks 设为 false）。
 
 ---
 

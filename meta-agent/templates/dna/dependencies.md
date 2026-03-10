@@ -1,6 +1,13 @@
+---
+# DNA Dependencies Template (Generic) - IDE Agnostic Format
+last_verified: # YYYY-MM-DD, update when dependencies change
+---
+
 # 依赖声明
 
 > 本文件是 AI 的依赖白名单和语义上下文。声明**为什么依赖、契约是什么、允许使用哪些接口**。
+
+## 依赖列表
 
 - 无（如无依赖请保留此条）
 

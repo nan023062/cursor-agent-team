@@ -1,12 +1,17 @@
+---
+# DNA Architecture Template (Designer) - IDE Agnostic Format
+last_verified: # YYYY-MM-DD
+maintainer: # @username
+level: # L1 (framework) | L2 (rules) | L3 (gameplay)
+---
+
 # 系统设计架构
 
 > 编写指南：保持 50–150 行。描述设计决策，不写代码。
 
-- **last_verified**: <!-- YYYY-MM-DD -->
-
 ## 概述
 <!-- 2-3 句：这个系统给玩家什么体验？解决什么设计问题？ -->
-- **层级**：L1 框架 / L2 规则 / L3 玩法
+<!-- 层级信息已移至 front matter 的 level 字段 -->
 
 ## 核心循环
 <!-- 用一句话 + 一个循环图描述 -->

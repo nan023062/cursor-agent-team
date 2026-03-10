@@ -1,3 +1,8 @@
+---
+# DNA Changelog Template (Generic) - IDE Agnostic Format
+current_version: "0.1"
+---
+
 # Changelog
 
 ## v0.1

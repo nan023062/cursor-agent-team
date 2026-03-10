@@ -1,6 +1,18 @@
+---
+# DNA Pitfalls Template (Designer) - IDE Agnostic Format
+tags:
+  - balance
+  - interaction
+  - scope
+  - ux
+  - economy
+  - progression
+  - edge-case
+---
+
 # 设计避坑记录
 
-标签: `#balance` `#interaction` `#scope` `#ux` `#economy` `#progression` `#edge-case`
+可用标签: `#balance` `#interaction` `#scope` `#ux` `#economy` `#progression` `#edge-case`
 
 标签说明:
 - `#balance` — 数值不平衡（太强/太弱/通胀/通缩）

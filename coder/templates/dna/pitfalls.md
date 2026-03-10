@@ -1,6 +1,18 @@
+---
+# DNA Pitfalls Template - IDE Agnostic Format
+tags:
+  - performance
+  - architecture
+  - logic
+  - integration
+  - memory
+  - api
+  - config
+---
+
 # 避坑记录
 
-标签: `#performance` `#architecture` `#logic` `#integration` `#memory` `#api` `#config`
+可用标签: `#performance` `#architecture` `#logic` `#integration` `#memory` `#api` `#config`
 
 ---
 
