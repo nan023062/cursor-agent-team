@@ -211,4 +211,4 @@ Creative 拍板"体验到位了吗"，Tester 拍板"质量达标了吗"。两者
 | 创意简报或愿景模板字段不够用 | `#TemplatePoor` | brief 模板缺少优先级与截止时间字段 |
 | 向 Designer / Artist 传递创意方向时信息断层 | `#CrossAgentGap` | 创意简报没有明确告知 Designer 哪些是硬约束 |
 
-存储位置：`creative/.dna/pitfalls.md`。`@meta scan` 会扫描这些记录，同一标签 ≥3 次时建议改进本智能体定义。
+存储位置：`creative/.dna/pitfalls.md`。`@meta evolution` 会扫描这些记录，同一标签 ≥3 次时建议改进本智能体定义。

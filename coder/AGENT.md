@@ -414,4 +414,4 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 | 使用了模板但需要大量手动补充 | `#TemplatePoor` | architecture.md 模板缺少性能约束字段 |
 | 与其他智能体协作时信息断层 | `#CrossAgentGap` | Designer 规格不明确从哪个文件读 |
 
-存储位置：`coder/.dna/pitfalls.md`。`@meta scan` 会扫描这些记录，同一标签 ≥3 次时建议改进本智能体定义。
+存储位置：`coder/.dna/pitfalls.md`。`@meta evolution` 会扫描这些记录，同一标签 ≥3 次时建议改进本智能体定义。
