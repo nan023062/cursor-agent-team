@@ -1,71 +1,31 @@
-# Portable AI Agent Team
+# Cursor Agent Team
 
-A **portable, IDE-agnostic**, self-evolving AI team framework.
+A portable, self-evolving AI team framework for [Cursor IDE](https://cursor.com).
 
-**Works with any AI coding IDE. Zero vendor lock-in.**
+**Zero config. Copy and go.**
 
 > Each agent has its own memory (`.dna/`), learns from mistakes (`pitfalls`), and evolves rules over time (`evolution`). A meta-agent can create new agents on demand.
 
 ---
 
-## IDE Agnostic Architecture
-
-This framework is designed to work with **any AI coding IDE**:
-
-| IDE | Status | Adapter |
-|-----|--------|---------|
-| Cursor | ✅ Supported | `adapters/cursor/` |
-| Claude Code | 🔜 Planned | `adapters/claude/` |
-| Trae | 🔜 Planned | `adapters/trae/` |
-| GitHub Copilot | 🔜 Planned | `adapters/copilot/` |
-
-### How It Works
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Portable Layer (IDE Agnostic)            │
-├─────────────────────────────────────────────────────────────┤
-│  agent-manifest.yaml    ← Single source of truth            │
-│  AGENT.md               ← Agent definitions (pure Markdown) │
-│  .dna/                  ← Module memory (pure Markdown)     │
-│  protocols/             ← Workflow definitions              │
-│  templates/             ← File templates                    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ adapters generate
-┌─────────────────────────────────────────────────────────────┐
-│                    IDE-Specific Layer (Generated)           │
-├─────────────────────────────────────────────────────────────┤
-│  .cursor/rules/*.mdc    ← Cursor rules                      │
-│  .cursor/commands/*.md  ← Cursor slash commands             │
-│  CLAUDE.md              ← Claude Code config                │
-│  .trae/                 ← Trae config (future)              │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
 ## What Makes This Different
 
-- **IDE Agnostic** — Core definitions in `agent-manifest.yaml` and `.dna/` are pure YAML/Markdown. IDE adapters generate native configurations.
 - **Self-Evolving Memory** — Agents remember mistakes in `.dna/pitfalls.md`. When patterns repeat (3+ times), `evolution` promotes them into permanent rules in `.dna/architecture.md`. The team gets smarter over time.
 - **Zero Configuration** — Copy one folder into your project. First `init` creates everything automatically. No config files, no environment variables, no setup scripts.
 - **Meta-Agent Creates Agents** — `@meta new` interactively generates a fully-formed agent with 14 standard patterns, ready to work.
-- **Fully Portable** — No hardcoded paths. No project-specific content. Works in any project with any AI IDE.
+- **Precise Context Injection** — Each agent's `.mdc` rule file uses Cursor's glob system to activate only when editing relevant files. No noise.
+- **Fully Portable** — No hardcoded paths. No project-specific content. Works in any Cursor project.
 
 ---
 
 ## Install
 
 ```bash
-# Copy the team directory into your project root
-git clone <repo-url> /path/to/your/project/gamedev/
-
-# Then generate IDE-specific configs
-python gamedev/adapters/cursor/generate.py  # For Cursor
+# Copy the team directory into your project
+git clone <repo-url> /path/to/your/project/.cursor/gamedev/
 ```
 
-That's it. No dependencies (except PyYAML for adapters), no build step.
+That's it. No dependencies, no build step.
 
 ---
 
@@ -90,24 +50,21 @@ That's it. No dependencies (except PyYAML for adapters), no build step.
 ## How It Works
 
 ```
-gamedev/
-├── agent-manifest.yaml         # Single source of truth (IDE agnostic)
-├── {agent}/AGENT.md            # Agent definition (portable)
-│
-│   ▼  adapters/cursor/generate.py
-│
-.cursor/rules/{agent}-rules.mdc # Generated: Cursor-specific rules
-.cursor/commands/{agent}-*.md   # Generated: Cursor slash commands
-│
-│   ▼  daily work
-│
-{module}/.dna/pitfalls.md       # Mistakes accumulate
-│
-│   ▼  @agent evolution
-│
-{module}/.dna/architecture.md   # Patterns promoted to permanent rules
-│
-│   ▼  next operation reads evolved rules — cycle repeats
+AGENT.md                        # What the agent does (portable, no project paths)
+    |
+    v  first init
+.cursor/rules/{agent}-rules.mdc # Project paths + architecture diagram + constraints
+    |
+    v  @meta sync
+.cursor/commands/{agent}-*.md   # Cursor slash commands
+    |
+    v  daily work
+.dna/pitfalls.md                # Mistakes accumulate
+    |
+    v  evolution
+.dna/architecture.md            # Patterns promoted to permanent rules
+    |
+    v  next operation reads evolved rules — cycle repeats
 ```
 
 ---
@@ -147,31 +104,26 @@ The meta-agent asks what the agent manages, its commands, responsibilities, and 
 ## Directory Structure
 
 ```
-gamedev/                          # Portable agent team
-├── agent-manifest.yaml           # [NEW] Single source of truth for all agents
-├── adapters/                     # [NEW] IDE-specific generators
-│   ├── cursor/generate.py        # Generates .cursor/ configs
-│   ├── claude/                   # (future) Claude Code adapter
-│   └── README.md                 # Adapter development guide
-├── meta-agent/                   # Agent factory + auditor
+gamedev/                       # Copy this into .cursor/
+├── meta-agent/                # Agent factory + auditor
 │   ├── AGENT.md
-│   ├── protocols/                # sync, scan, evolution
-│   └── templates/                # Agent skeleton, .dna/ templates
-├── creative/                     # Creative agent
-├── designer/                     # Design agent
-├── coder/                        # Code agent
-├── artist/                       # Art agent
-└── tester/                       # Test agent
+│   ├── protocols/             # sync, scan, evolution
+│   └── templates/             # Agent skeleton, .dna/ templates
+├── creative/                  # Creative agent
+├── designer/                  # Design agent
+├── coder/                     # Code agent
+├── artist/                    # Art agent
+└── tester/                    # Test agent
 ```
 
 Each agent:
 ```
 {agent}/
-├── AGENT.md                   # Agent definition (IDE agnostic)
+├── AGENT.md                   # Agent definition
 ├── README.md                  # Usage guide
 ├── .dna/pitfalls.md           # Self-reflection log
 ├── protocols/                 # (optional) Detailed workflows
-└── templates/                 # (optional) File templates with YAML front matter
+└── templates/                 # (optional) File templates
 ```
 
 ---
@@ -180,35 +132,12 @@ Each agent:
 
 Every managed module gets a `.dna/` directory:
 
-| File | Purpose | Written By | Format |
-|------|---------|-----------|--------|
-| `architecture.md` | Permanent rules, boundaries, constraints | `evolution` | YAML front matter + Markdown |
-| `pitfalls.md` | Raw lessons learned | Daily operations | YAML front matter + Markdown |
-| `changelog.md` | Change history | Daily operations | YAML front matter + Markdown |
-| `dependencies.md` | Dependency whitelist | `init` / as needed | YAML front matter + Markdown |
-| `wip.md` | Work in progress | Session continuity | YAML front matter + Markdown |
-
-### YAML Front Matter
-
-All `.dna/` files use standard YAML front matter for metadata:
-
-```markdown
----
-last_verified: 2026-03-10
-maintainer: "@username"
-boundary: hard
----
-
-# Architecture
-
-...content...
-```
-
-This format is:
-- Parseable by any programming language
-- Readable by any AI IDE
-- Compatible with static site generators
-- Version control friendly
+| File | Purpose | Written By |
+|------|---------|-----------|
+| `architecture.md` | Permanent rules, boundaries, constraints | `evolution` (promoted from pitfalls) |
+| `pitfalls.md` | Raw lessons learned | Daily operations |
+| `changelog.md` | Change history | Daily operations |
+| `dependencies.md` | Dependency whitelist | `init` / as needed |
 
 The evolution cycle:
 
@@ -221,24 +150,10 @@ Work → Make mistakes → Record in pitfalls
 
 ---
 
-## Generate IDE Configurations
-
-After modifying `agent-manifest.yaml`, regenerate IDE-specific configs:
-
-```bash
-# For Cursor
-python gamedev/adapters/cursor/generate.py
-
-# Dry run (preview without writing)
-python gamedev/adapters/cursor/generate.py --dry-run
-```
-
----
-
 ## License
 
 [MIT](LICENSE)
 
 ---
 
-**[Chinese / 中文文档](README.zh-CN.md)**
+**[Chinese / 中文文档](README.zh.md)**

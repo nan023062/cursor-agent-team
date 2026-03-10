@@ -1,8 +1,3 @@
----
-# DNA Changelog Template (Designer) - IDE Agnostic Format
-current_version: "0.1"
----
-
 # 设计变更记录
 
 ## v0.1

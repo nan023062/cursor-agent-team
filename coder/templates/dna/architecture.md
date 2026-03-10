@@ -1,19 +1,17 @@
----
-# DNA Architecture Template - IDE Agnostic Format
-# All metadata uses YAML front matter for universal parsing
-last_verified: # YYYY-MM-DD, update after each Phase 2/3 verification
-maintainer: # @username, required for team projects
-boundary: hard # hard | soft | shared (see AGENT.md for definitions)
----
-
 # 架构设计
 
 > 编写指南：总体保持 50–150 行。每段回答核心问题，不复制代码。
-> last_verified 超过 30 天未更新时 Phase 3 发出警告。
+
+<!-- ═══ 元数据 ═══ -->
+- **last_verified**: <!-- YYYY-MM-DD，每次 Phase 2/3 验证后更新。超过 30 天未更新时 Phase 3 发出警告 -->
+
+<!-- ═══════════════════════════════════════════
+     核心字段（必填 — 每次变更时必须同步更新）
+     ═══════════════════════════════════════════ -->
 
 ## 概述
 <!-- 2-3 句话：这个程序集是什么？解决什么核心问题？ -->
-<!-- 维护者信息已移至 front matter 的 maintainer 字段 -->
+- **维护者**：<!-- @xxx，团队项目必填，单人项目可省略。维护者拥有本程序集架构与依赖的最终决策权 -->
 
 ## 核心模型
 <!-- 每个关键类/结构 2-3 行：职责、关键字段、与其他模型的关系。

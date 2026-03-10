@@ -1,8 +1,3 @@
----
-# DNA Changelog Template - IDE Agnostic Format
-current_version: "0.1"
----
-
 # Changelog
 
 > 每条变更记录应包含结构化度量，供 Phase 3 趋势分析使用。

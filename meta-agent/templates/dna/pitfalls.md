@@ -1,17 +1,12 @@
----
-# DNA Pitfalls Template (Generic) - IDE Agnostic Format
-# Define domain-specific tags below
-tags: [] # e.g., [performance, architecture, logic, integration]
----
-
 # 避坑记录
 
-可用标签: <!-- 由智能体定义领域标签，如 #performance #architecture #logic -->
+标签: {== 由智能体定义领域标签，如 #performance #architecture #logic ==}
 
-标签说明:
+{== 标签说明（由智能体填写，示例）:
 - `#performance` — 性能问题
 - `#architecture` — 架构/边界问题
 - `#logic` — 逻辑错误
+==}
 
 ---
 

@@ -1,12 +1,12 @@
-# 同步协议（诊断 + Manifest + IDE 配置）
+# 同步协议（诊断 + Rules + Commands）
 
-> `@meta sync` 时执行。一次性完成智能体健康诊断、manifest 一致性检查、IDE 配置同步建议。
+> `@meta sync` 时执行。合并了原 `@meta health` 的全部职责。一次性完成智能体健康诊断、规则文件（`.mdc`）和快捷指令（`.md`）的生成、比对、一致性检查。
 
 ## 背景
 
 - **Agent 健康**：每个智能体的 `.dna/` 目录记录了永久规则、经验教训和变更历史，需要定期检查过期和膨胀。
-- **Manifest**：`agent-manifest.yaml` 是所有智能体的统一描述文件（IDE 无关），应与实际目录结构保持同步。
-- **IDE 配置**：各 IDE 的配置文件由适配器从 manifest 生成，sync 检查是否需要重新生成。
+- **Rules**：Cursor 从 `.cursor/rules` 加载 `.mdc` 规则文件，控制智能体在特定 globs 下的行为。
+- **Commands**：Cursor 从 `.cursor/commands` 加载 `.md` 指令文件，用户输入 `/coder-dev` 即可触发对应智能体流程。
 
 三者都源自 AGENT.md 中的声明，应当保持同步。
 
@@ -14,9 +14,9 @@
 
 ## 步骤
 
-### 0. 自检
+### 0. 自检 meta-agent commands
 
-检查 `../agent-manifest.yaml` 是否存在。缺失则从模板创建。
+检查 `.cursor/commands/` 下是否存在 meta-agent 自身的指令文件（`meta-new.md`、`meta-sync.md`、`meta-evolution.md`）。缺失的立即生成。
 
 ### 1. 扫描智能体
 
@@ -24,17 +24,14 @@
 
 对每个智能体，读取定义文件，提取：
 
-**基本信息**：
-- 智能体名（目录名）
-- 描述（从 YAML front matter）
-- 管辖路径（从 `## 管理范围` 或 `## 管辖范围` 段）
+**rule 文件**：检查 `.cursor/rules/{agent}-rules.mdc` 是否存在。
 
 **触发指令**（`## 触发` 段）：
 - 指令名（如 `@coder dev`）
 - 参数（如 `[路径] [需求]`）
-- 说明/阶段（如 `Phase 2: Develop`）
+- 说明/阶段（如 `Phase 2: Develop`）→ 映射为模板变量 `{PHASE_DESCRIPTION}`，用于区分同动词 command
 
-无 `触发` 段的标记为「无指令定义」。
+无 rule 文件的智能体标记为「未 init」。无 `触发` 段的标记为「无指令定义」。
 
 ### 2. Agent 健康诊断
 
@@ -51,30 +48,75 @@
 
 输出健康摘要，不修改任何文件。
 
-### 3. 检查 Manifest 一致性
+### 3. 确保输出目录存在
 
-读取 `../agent-manifest.yaml`，与已发现的智能体比对：
+检查 `.cursor/rules` 和 `.cursor/commands` 目录是否存在，不存在则自动创建。
+
+### 4. 检查 Rules
+
+读取 `.cursor/rules` 下所有 `*-rules.mdc` 文件，与已发现的智能体比对：
 
 | 情况 | 判定 | 操作 |
 |------|------|------|
-| agent 目录存在但 manifest 未注册 | **未注册** | 建议添加到 manifest |
-| manifest 有配置但目录不存在 | **孤立** | 建议从 manifest 移除 |
-| definition 路径无效 | **路径错误** | 建议修正 |
-| managed_paths 与实际不符 | **漂移** | 建议更新 |
-| 完全一致 | **同步** | 无需操作 |
+| `.mdc` 不存在 | **未 init** | 提示执行 agent init |
+| `.mdc` 存在且格式正确 | **正常** | 无需操作 |
+| `.mdc` 存在但缺少必要段（管辖路径/架构图/约束） | **不完整** | 提示补全 |
+| `.mdc` 存在但无对应智能体 | **孤立** | 建议删除 |
 
-### 4. 一致性检查
+### 5. 比对 Commands
+
+读取 `.cursor/commands` 下所有 `.md` 文件，区分自动生成的（含 `<!-- [meta-commands] -->` 或 `<!-- [brain-commands] -->` 标记）和手动创建的。
+
+与智能体的触发指令比对：
+
+| 情况 | 判定 | 操作 |
+|------|------|------|
+| 智能体有指令但无对应 command 文件 | **缺失** | 生成新文件 |
+| command 文件存在且内容一致 | **同步** | 无需操作 |
+| command 文件存在但内容不一致 | **漂移** | 建议更新 |
+| command 文件存在但智能体已无该指令 | **孤立** | 建议删除 |
+| 无标记的手动文件 | **跳过** | 不触碰 |
+
+**command 文件名规则**：
+- `{agent_name}-{command}.md`，全小写，用 `-` 连接
+- 示例：`coder-dev.md`、`designer-spec.md`、`artist-check.md`
+
+**command 文件内容模板**（`templates/command.md`）：
+
+```markdown
+<!-- [meta-commands] 由 @meta sync 自动生成，请勿手动编辑 -->
+# {AGENT_NAME}-{COMMAND}
+## 目标：{PHASE_DESCRIPTION}。读取 ../{AGENT_NAME}/AGENT.md，执行其中 `{COMMAND}` 相关的 Phase 流程。
+
+参数：{ARGS_DESCRIPTION}
+
+路径参数解析：用户提供了路径则用用户输入；未提供则用当前 IDE 选中的文件/目录；都没有则提示参数缺少。
+
+执行前先按 AGENT.md 中的「上下文加载协议」加载必要文件。
+```
+
+**模板变量映射**：
+
+| 变量 | 来源 |
+|------|------|
+| `{AGENT_NAME}` | 智能体名（目录名） |
+| `{COMMAND}` | 触发表"触发方式"列中的指令动词（如 `dev`、`bug`） |
+| `{PHASE_DESCRIPTION}` | 触发表"阶段"列的值（如 `Bug 修复（改代码）`），用于区分同动词 command |
+| `{ARGS_DESCRIPTION}` | 触发表"触发方式"列中的参数部分 + Phase 段的参数说明 |
+
+### 6. 一致性检查
 
 跨维度检查路径和命名规范：
 
 | 检查项 | 检查内容 | 异常判定 |
 |--------|---------|---------|
-| definition 路径 | 是否指向有效的 AGENT.md | 路径指向不存在的文件 |
-| managed_paths | 路径格式是否有效 | 无效的 glob 模式 |
+| `.mdc` globs | globs 是否覆盖 agent 管辖路径 | globs 与实际管辖路径不匹配 |
+| rule_file 命名 | 是否符合 `{agent}-rules.mdc` 规范 | 命名不规范 |
+| command 文件命名 | 是否符合 `{agent}-{command}.md` 规范 | 命名不规范 |
+| command 内容路径 | 引用的 AGENT.md 路径是否有效 | 路径指向不存在的文件 |
 | agent name ↔ 目录名 | AGENT.md 的 `name` 与所在目录名是否一致 | 名称不一致 |
-| triggers pattern | 正则模式是否有效 | 无效的正则表达式 |
 
-### 5. 输出统一报告
+### 7. 输出统一报告
 
 ```
 @meta sync 报告 — YYYY-MM-DD
@@ -92,19 +134,40 @@
 [缺失]
   ❌ {agent_name} — {缺失描述}（如：无 .dna/pitfalls.md）
 
-═══ Manifest 同步 ═══
+═══ Rules 同步 ═══
 
 [已同步]
-  ✓ {agent_name} — 配置与实际一致
+  ✓ {agent_name} → {rule_file}
 
-[未注册]
-  + {agent_name} — 建议添加到 agent-manifest.yaml
+[需生成]
+  + {agent_name} → {rule_file}（globs: ...）
 
 [需更新]
-  ~ {agent_name} — {差异描述}
+  ~ {agent_name} → {rule_file}
+    差异：{展示不一致项}
 
 [孤立]
-  ? {agent_name} — manifest 中存在但目录不存在，建议移除
+  ? {rule_file} → 无对应智能体，建议删除
+
+[无规则定义]
+  - {agent_name}（未 init）
+
+═══ Commands 同步 ═══
+
+[已同步]
+  ✓ /{agent}-{cmd} → @{agent} {cmd} [参数]
+
+[需生成]
+  + /{agent}-{cmd} → @{agent} {cmd} [参数]
+
+[需更新]
+  ~ /{agent}-{cmd} → 内容已变更
+
+[孤立]
+  ? /{filename} → 建议删除
+
+[手动指令（跳过）]
+  - /{filename}
 
 ═══ 一致性检查 ═══
 
@@ -115,34 +178,22 @@
 ⚠️ 发现 {n} 项一致性问题：
   - {agent}: {问题描述}
 
-═══ IDE 配置建议 ═══
-
-{如 manifest 有变更：}
-建议运行适配器重新生成 IDE 配置：
-  python gamedev/adapters/cursor/generate.py
-
 ═══ 汇总 ═══
 
-| 类别 | 同步 | 需添加 | 需更新 | 孤立 |
+| 类别 | 同步 | 需生成 | 需更新 | 孤立 |
 |------|------|--------|--------|------|
 | Agent 健康 | {n} | — | — | — |
-| Manifest | {n} | {n} | {n} | {n} |
+| Rules | {n} | {n} | {n} | {n} |
+| Commands | {n} | {n} | {n} | {n} |
 健康异常：{n} 项
 一致性问题：{n} 项
 ```
 
-### 6. 等待确认
+### 8. 等待确认
 
-- 回复「更新」→ 更新 manifest 中的漂移项
-- 回复「添加」→ 将未注册的 agent 添加到 manifest
-- 回复「全部」→ 更新 + 添加 + 移除孤立
+- 回复「生成」→ 写入所有缺失的 rules + commands
+- 回复「全部」→ 生成 + 更新 + 删除孤立
 - 回复「跳过」→ 不做修改
-
-确认后，如有 manifest 变更，提示运行适配器：
-
-```bash
-python gamedev/adapters/cursor/generate.py
-```
 
 ---
 
@@ -150,6 +201,6 @@ python gamedev/adapters/cursor/generate.py
 
 - 不自动删除任何文件，孤立项仅提示
 - write_mode 为 auto，直接写入
+- 只操作带 `<!-- [meta-commands] -->` 或 `<!-- [brain-commands] -->` 标记的 command 文件，不触碰手动创建的指令
+- 不修改 `alwaysApply` 规则文件的核心内容
 - 不修改智能体的 AGENT.md 文件
-- IDE 配置由适配器生成，sync 只检查不直接修改
-- manifest 变更需用户确认后执行

@@ -1,15 +1,10 @@
----
-# DNA Dependencies Template - IDE Agnostic Format
-last_verified: # YYYY-MM-DD, update when dependencies change
----
-
 # 依赖声明
 
 > 本文件是 AI 的依赖白名单和语义上下文。物理依赖（package.json / .csproj / go.mod 等）由原生工具管理，此处聚焦于 **为什么依赖、边界契约是什么、允许使用哪些 API**。
 
-## 依赖列表
-
 - 无（如无依赖请保留此条）
+
+## 依赖列表
 
 <!-- 格式：
 - **程序集名**
