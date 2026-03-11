@@ -1,4 +1,4 @@
----
+﻿---
 name: coder
 description: Coder — 编程智能体。以程序设计核心思想管理大型代码工程，通过程序集封装实现内聚、解耦与自进化。
 ---
@@ -88,20 +88,36 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 
 ## 上下文加载协议
 
+### 视界分级（Context Window Access Level）
+
+当 AI 在程序集 A 开发时，对所有外部程序集的访问权限按以下四级严格管控：
+
+| 依赖类型 | AI 允许加载的文件 | AI 行为准则 |
+|---------|----------------|------------|
+| **当前程序集 (Current)** | `.dna/` 全部文件 + **全部源码** | 拥有绝对修改权，聚焦核心业务逻辑的实现 |
+| **共享层 / 软边界 (Shared/Soft)** | `.dna/` 文件 + 目标 `## Public API` 源码 | 允许直接读取接口定义和部分实现，允许直接调用，无需走跨程序集繁琐流程 |
+| **硬边界依赖 (Hard Dependency)** | 仅限目标模块的 `.dna/architecture.md` | 绝对黑盒。禁止读取任何 `.cs` 源码。只能根据文档中的 `## Public API` 签名进行调用和参数传递 |
+| **非依赖模块 (Unlinked)** | **无权访问** | 物理隔离。AI 根本不知道它们的存在，彻底切断非法引用 |
+
+> 程序集边界类型来自其 `architecture.md` 的 `- **边界模式**` 字段（`boundary: hard / soft / shared`）；未声明时默认 `hard`。
+
+### 加载顺序（当前程序集必读文件）
+
 进入任何程序集操作前，按顺序加载：
 
 | 文件 | 时机 | 目的 |
 |------|------|------|
 | `coder-rules.mdc` | 必读（首次） | 获取管辖路径、架构图、协作路径 |
-|| coder/.dna/cross-assembly-patterns.md | 必读（若文件非空） | 获取已知的跨程序集高频陷阱，避免重蹈跨集共性问题 |
+| coder/.dna/cross-assembly-patterns.md | 必读（若文件非空） | 获取已知的跨程序集高频陷阱，避免重蹈跨集共性问题 |
 | `architecture.md` | 必读 | 理解定位、边界、核心模型 |
 | `pitfalls.md` | 必读 | 避免重蹈覆辙 |
-| `dependencies.md` | 必读 | 了解允许引用的依赖 |
+| dependencies.md | 必读 | 了解允许引用的依赖，并确认每个依赖的边界类型（hard/soft/shared） |
 | `wip.md` | 续接会话时 | 检查未完成任务，决定续接或新建 |
-| 需求相关的源文件 | 按需 | 理解当前实现 |
-| 被依赖程序集的 `architecture.md` | 按需 | 只读其「程序集边界」段，了解可用接口 |
+| 需求相关的源文件 | 按需（Current 级） | 理解**当前程序集**内部实现 |
+| Shared/Soft 程序集的 .dna/ + Public API 源码 | 按需（Shared/Soft 级） | 了解接口定义，允许直接调用 |
+| Hard 程序集的 .dna/architecture.md（仅 ## Public API 段） | 按需（Hard 级） | 了解接口签名，**禁止**读取其任何源文件 |
 
-**禁止**：读取非依赖程序集的源代码或内部实现。
+**铁律**：Unlinked 程序集无权访问任何文件，Hard 程序集禁止读取源码——违反即越界。
 
 ---
 
@@ -142,6 +158,7 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 
 1. 创建 `.dna/` 目录
 2. 从 `templates/dna/` 注入 dna 模板到 `.dna/`，从 `templates/` 注入其他模板到根目录（确保 UTF-8 BOM 编码）
+2a. **扫描 Public API**：若目录内已有任何源文件，扫描所有源文件，提取 `public` 类/方法/属性声明，以 C# 代码签名块填入 `architecture.md ## Public API`；无源码时保留模板占位符
 3. 填写 `.dna/dependencies.md` 依赖说明
 4. 同步依赖到 `README.md` 的 MCP Index
 5. 在 `README.md` 建立文档索引和 MCP 索引
@@ -150,6 +167,8 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 ### 存量导入模式
 
 按 `protocols/legacy-deployment.md` 的分阶段流程执行：健康审计 → 知识抢救 → 试点 → 扩展 → 持续治理。
+
+**Public API 提取（必做）**：「知识抢救」阶段须扫描程序集目录下所有源文件，提取所有 `public` 修饰的类/方法/属性声明，以 C# 代码签名块填入 `architecture.md ## Public API`。这是 architecture.md 作为「API 唯一权威来源」的基础，**不得跳过**。
 
 **合并策略**：若已存在 `README.md`，不覆盖，仅追加缺失段。
 
@@ -164,12 +183,34 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 ```
 
 1. **加载上下文** — 按「上下文加载协议」读取 `.dna/` 文件
-2. **实现代码** — 仅在程序集目录内修改
-3. **边界守卫** — 检查 3 项（发现问题立即修正）：
+2. **实现代码** — 仅在程序集目录内修改；调用依赖程序集时遵守「依赖调用铁律」
+3. **边界守卫** — 检查 4 项（发现问题立即修正）：
    - [ ] **边界合规**：未修改程序集目录以外的代码
    - [ ] **依赖合规**：未引用 `dependencies.md` 以外的依赖
    - [ ] **文档时效**：更新 `architecture.md` 的 `last_verified` 为今天日期
+   - [ ] **API 文档同步**：若本次新增/修改/删除了任何 `public` 方法/类/属性，必须同步更新 `architecture.md ## Public API` 的 csharp 签名块；变更为 Breaking Change 时在 `changelog.md` 标注 `[BREAKING]`
 4. **测试** — 失败则进入「错误恢复协议」
+
+---
+
+### 依赖调用铁律（boundary: hard 程序集）
+
+调用 `dependencies.md` 中声明的依赖程序集时，以下三条规则不可违背：
+
+| 规则 | 约束 |
+|------|------|
+| **黑盒原则** | 严禁打开或读取依赖程序集的任何源文件；只能静默读取其 `.dna/architecture.md` 的 `## Public API` 章节 |
+| **接口驱动** | 假设目标程序集内部实现完全未知；只能依据 Public API 的方法签名、参数类型、返回值类型进行编码，不得猜测内部字段或调用非 Public API 成员 |
+| **接口缺失 → 强制挂起** | 若 `## Public API` 中没有所需接口，**立即停止编码**，禁止在当前程序集上下文中修改目标程序集代码；在 `wip.md` 记录阻断原因；输出标准阻断消息 |
+
+**接口缺失阻断消息格式**（逐字输出，不得省略）：
+
+```
+[阻断] 依赖模块 <模块名> 缺少 <描述> 接口。
+请先通过 @coder dev <模块名> 补充该接口，再来续接本任务。
+```
+
+---
 
 ### 按需触发（条件成立时才执行）
 
@@ -179,7 +220,7 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 | 设计决策 / 边界 / 核心模型变更 | 先更新 `architecture.md` | 实现前 |
 | 引入新依赖 | 先更新 `dependencies.md` | 实现前 |
 | 修 Bug 或踩坑 | 追加 pitfalls.md（结构化格式，含标签）；同步追加一行到 coder/pitfall-index.md（日期\|标签\|程序集\|摘要）；若同标签在 ≥2 个其他程序集出现，写入/更新 coder/.dna/cross-assembly-patterns.md | 实现后 |
-| 公共 API 变更 | 同步 README 中英文 | 实现后 |
+| 公共 API 变更 | ① 先更新 `architecture.md ## Public API`（csharp 签名块）② 再同步 README 中英文 | 实现后 |
 | 跨程序集需求 | 进入「跨程序集协同」流程 | 实现前 |
 | 性能问题（超预算/卡顿/GC 峰值） | 进入「性能优化协议」（见 `protocols/performance-optimization.md`） | 实现前 |
 | 实现完成准备提交 | 执行 Code Review 自查（见 `protocols/code-review.md`），标注 `[self-reviewed]` | 提交前 |
@@ -196,6 +237,8 @@ dna 模板见 `templates/dna/`，其他模板见 `templates/`，流程协议见 
 | 连续 3 次失败 | **降级**：只输出分析和方案，不写代码，等待用户指导 | — |
 
 每次错误恢复均须在 `pitfalls.md` 记录教训。
+
+> **接口缺失（依赖模块）专项处理**：目标依赖的 `## Public API` 中不存在所需接口时，停止编码 → 写 `wip.md` 阻断原因 → 逐字输出「依赖调用铁律」中定义的标准阻断消息。上限：— （不重试，等待接口就绪后通过 `@coder dev` 续接）。
 
 ### 跨程序集协同
 

@@ -12,6 +12,7 @@
 ## 概述
 <!-- 2-3 句话：这个程序集是什么？解决什么核心问题？ -->
 - **维护者**：<!-- @xxx，团队项目必填，单人项目可省略。维护者拥有本程序集架构与依赖的最终决策权 -->
+- **边界模式**: `boundary: hard | soft | shared`<!-- hard=默认，独立模块；soft=同层 feature 间受控共享；shared=公共基础层，任何程序集均可引用 -->
 
 ## 核心模型
 <!-- 每个关键类/结构 2-3 行：职责、关键字段、与其他模型的关系。
@@ -25,9 +26,12 @@
 - **边界约束**：本程序集特有的禁止事项
 
 ## Public API
-<!-- 列出本程序集对外暴露的关键接口，供依赖方参考。
+<!-- 使用 C# 代码签名格式（只写签名，不写实现），最大化 LLM 代码权重，杜绝参数幻觉。
      修改此段时必须在 changelog.md 标注 [BREAKING]，并通知所有依赖方。 -->
-- `ClassName.Method(params)` — 用途简述
+```csharp
+// --- 分组注释 ---
+public ReturnType MethodName(ParamType param);  // 所属类，用途简述
+```
 <!-- Breaking Change 时：
      1. changelog.md 标注 [BREAKING] + 迁移指引
      2. 在所有依赖方的 dependencies.md 中追加 [NOTICE] 标记 -->
