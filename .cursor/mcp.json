@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "dna-mcp": {
+      "type": "stdio",
+      "command": "dna-mcp/dna-mcp/bin/Release/net8.0/dna-mcp.exe",
+      "args": [],
+      "env": {
+        "DNA_MCP_PROJECT_ROOT": "C:\\XDTWorkspace\\linan1_stage_001\\Client"
+      },
+      "description": "DNA-MCP：Agentic OS 三层核心服务（任务调度器 + DNA 拓扑管理器 + 工作区执行器）"
+    }
+  }
+}

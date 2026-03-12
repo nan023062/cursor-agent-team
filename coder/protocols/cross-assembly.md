@@ -8,10 +8,21 @@
 
 ## 协同流程
 
-### 1. 影响分析
+### 1. 影响分析 + 排序执行
 
-- 列出涉及的所有程序集
-- 为每个程序集标注变更类型：
+调用 MCP 工具一步完成影响分析和拓扑排序：
+
+```
+get_execution_plan {assemblyNames} {projectRoot}
+```
+
+MCP 自动：
+- 读取各程序集 `.dna/dependencies.md`，构建有向图
+- 使用 Kahn 算法拓扑排序（被依赖方优先）
+- 检测循环依赖并报错（循环依赖须先解决，不得强行推进）
+- 返回有序执行列表：`底层程序集 → 中间层 → 上层程序集`
+
+变更类型仍需人工标注（MCP 无法判断业务意图）：
 
 | 变更类型 | 说明 |
 |---------|------|
@@ -20,41 +31,32 @@
 | 仅调用 | 只调用其他程序集的现有 API |
 | 无变更 | 不涉及代码修改，仅更新文档 |
 
-- 绘制依赖方向：A → B 表示 A 依赖 B
-
-### 2. 排序执行
-
-按依赖关系从底层到上层排序：
-
-- 被依赖方优先（如 `vena.core` 先于 `vena.module.*`）
-- 同层无依赖关系的程序集可顺序执行
-- 修改 API 的程序集必须先于仅调用的程序集
-
-### 3. 逐集执行
+### 2. 逐集执行
 
 每个程序集独立执行 Phase 2 主流程：
 
-1. 切换到该程序集，加载其上下文（重新执行上下文加载协议）
+1. 调用 `get_assembly_context {assembly} {currentAssembly} {root}` 加载上下文（MCP 物理过滤视界）
 2. 只修改该程序集目录内的代码
-3. 更新该程序集的 `architecture.md` 和 `dependencies.md`
-4. 完成后验证接口兼容性
+3. 若发现需要先开发依赖程序集：调用 `suspend_and_push` 挂起当前任务，切换到依赖程序集
+4. 依赖程序集完成后：调用 `complete_and_pop` 恢复上层任务
+5. 公共 API 变更后：调用 `extract_public_api {path} writeToArchitecture=true` 更新 architecture.md
 
 **关键约束**：每次只聚焦一个程序集的上下文，不同时操作多个程序集。
 
-### 4. 集成验证
+### 3. 集成验证
 
 全部程序集执行完毕后：
 
-- 检查所有新增/修改的跨程序集接口是否匹配（参数类型、返回值、命名空间）
+- 调用 `validate_dependency` 逐一校验跨程序集调用的 API 是否存在
 - 运行涉及的所有程序集的测试
-- 检查无循环依赖引入（A→B→C→A）
+- 检查无循环依赖引入（`get_execution_plan` 会自动检测）
 - 若下游程序集需要上游尚未完成的 API，必须先在上游完成后再继续
 
-### 5. 记录
+### 4. 记录
 
-- 每个程序集的 `changelog.md` 标注 `[跨程序集]` 并列出关联程序集名
-- 若有 Breaking Change，在所有受影响程序集的 `changelog.md` 标注 `[BREAKING]`
-- 在 `wip.md` 中记录整体进度，标注各程序集完成状态
+- 调用 `write_changelog {assemblyPath} feat {description} relatedAssemblies={...}` 追加变更记录（MCP 自动添加 `[跨程序集]` 标注）
+- 若有 Breaking Change，`write_changelog` 传入 `isBreaking=true`（MCP 自动添加 `[BREAKING]`）
+- 调用 `get_call_stack` 确认调用栈已清空，所有任务均已完成
 
 ## 并行模式（团队场景）
 

@@ -35,26 +35,28 @@
 - 按依赖关系排序：数据结构 → 核心逻辑 → 接口暴露 → 上层调用
 - 标注前置依赖（子任务 B 依赖子任务 A）
 
-### 4. 写入 WIP
+### 4. 写入调用栈
 
-将分解结果写入 `.dna/wip.md`：
+调用 `suspend_and_push` 将任务和子任务列表压入调用栈，状态自动持久化到 `.dna-mcp/call-stack.json`，跨会话自动恢复：
 
-```markdown
-## [需求简述]
-- 开始: YYYY-MM-DD
-- 状态: 进行中
-- 子任务:
-  - [ ] 子任务 1：描述（涉及文件 A, B）
-  - [ ] 子任务 2：描述（依赖子任务 1）
-  - [ ] 子任务 3：描述
+```
+suspend_and_push
+  projectRoot: {项目根目录}
+  currentAssembly: {程序集名}
+  taskDescription: {需求简述}
+  suspendReason: "任务分解，按子任务顺序执行"
+  contextSummary: "已完成：无。待完成：子任务1、2、3"
+  resumeCondition: "所有子任务完成"
+  subTasksJson: [{"description":"子任务1：描述","completed":false},...]
 ```
 
 ### 5. 逐步执行
 
 - 每次只执行一个子任务
-- 完成后在 `wip.md` 中标记 `[x]`
+- 完成后调用 `update_task_status {root} {assembly} {index} true` 标记完成
 - 每个子任务完成后运行自审查门禁
-- 若执行中发现需要调整计划，更新 `wip.md` 后继续
+- 若执行中发现需要调整计划，直接调用 `suspend_and_push` 更新上下文摘要后继续
+- 全部完成后调用 `complete_and_pop` 清理调用栈
 
 ## 注意事项
 

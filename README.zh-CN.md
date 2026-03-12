@@ -150,6 +150,22 @@ gamedev/                       # 复制到 .cursor/ 下
 
 ---
 
+## DNA-MCP Server
+
+`dna-mcp/` 目录包含 **Agentic OS** — 一个 C# MCP Server，将调度、拓扑管理和工作区操作从 AI 的上下文窗口中卸载到确定性程序层。
+
+```
+dna-mcp/                       # MCP Server + CLI 工具
+├── dna-mcp.csproj
+├── Cli/                       # CLI：dna-mcp cli <命令>
+├── Services/                  # 任务调度器、DNA 管理器、工作区执行器
+└── Tools/                     # MCP 工具定义
+```
+
+**[DNA-MCP 使用文档 →](dna-mcp/README.md)**
+
+---
+
 ## 许可
 
 [MIT](LICENSE)
