@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "agentic-os": {
+      "type": "stdio",
+      "command": "dotnet",
+      "args": ["run", "--project", "agentic-os/agentic-os/agentic-os.csproj", "--no-build"],
+      "env": {
+        "AGENTIC_OS_PROJECT_ROOT": "C:\\XDTWorkspace\\linan1_stage_001\\Client"
+      },
+      "description": "Agentic OS：任务调度器 + DNA 拓扑管理器 + 工作区执行器"
+    }
+  }
+}

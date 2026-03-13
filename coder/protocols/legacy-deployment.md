@@ -43,10 +43,15 @@
 ### 对 🟢 模块（选 3-5 个高频迭代的）
 
 1. 用 `@coder init` 初始化 `.dna/` 目录
-2. 填写 `architecture.md`（描述**当前实际**架构，不是理想架构）
-3. 填写 `pitfalls.md`（从团队记忆中挖掘历史教训）
-4. 填写 `dependencies.md`（厘清实际依赖关系）
-5. 填写 `architecture.md` 的「性能约束」段
+2. **提取 Public API（100% 准确）**：
+   ```
+   extract_public_api {assemblyPath} writeToArchitecture=true
+   ```
+   Roslyn 自动扫描所有 `.cs` 文件，精确提取 public 成员签名，直接写入 `architecture.md ## Public API`。
+3. 填写 `architecture.md` 其余段落（描述**当前实际**架构，不是理想架构）
+4. 填写 `pitfalls.md`（从团队记忆中挖掘历史教训）
+5. 填写 `dependencies.md`（厘清实际依赖关系）
+6. 填写 `architecture.md` 的「性能约束」段
 
 ### 对 🔴 模块（选最危险的 2-3 个）
 
