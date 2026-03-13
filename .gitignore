@@ -6,3 +6,7 @@ Thumbs.db
 .idea/
 .vs/
 .vscode/
+
+# Build
+bin/
+obj/

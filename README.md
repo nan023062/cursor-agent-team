@@ -152,17 +152,18 @@ Work → Make mistakes → Record in pitfalls
 
 ## DNA-MCP Server
 
-The `dna-mcp/` directory contains the **Agentic OS** — a C# MCP server that offloads scheduling, topology management, and workspace operations from the AI's context window into a deterministic program layer.
+The `agentic-os/` directory contains the **Agentic OS** — a C# MCP server that offloads scheduling, topology management, and workspace operations from the AI's context window into a deterministic program layer.
 
 ```
-dna-mcp/                       # MCP Server + CLI tool
-├── dna-mcp.csproj
-├── Cli/                       # CLI: dna-mcp cli <command>
+agentic-os/                    # MCP Server + CLI + UI
+├── agentic-os.csproj
+├── AgenticOs.UI/              # Avalonia 可视化界面
+├── Cli/                        # CLI: agentic-os cli <command>
 ├── Services/                  # Task Scheduler, DNA Manager, Workspace Operator
 └── Tools/                     # MCP tool definitions
 ```
 
-**[DNA-MCP Documentation →](dna-mcp/README.md)**
+**[Agentic OS Documentation →](agentic-os/README.md)**
 
 ---
 

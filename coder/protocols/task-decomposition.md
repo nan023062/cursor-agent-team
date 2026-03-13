@@ -37,7 +37,7 @@
 
 ### 4. 写入调用栈
 
-调用 `suspend_and_push` 将任务和子任务列表压入调用栈，状态自动持久化到 `.dna-mcp/call-stack.json`，跨会话自动恢复：
+调用 `suspend_and_push` 将任务和子任务列表压入调用栈，状态自动持久化到 `.agentic-os/call-stack.json`，跨会话自动恢复：
 
 ```
 suspend_and_push
