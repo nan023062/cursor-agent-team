@@ -6,28 +6,26 @@ namespace AgenticOs.Services;
 
 /// <summary>
 /// DNA 记忆与拓扑管理器
-/// 职责：扫描项目程序集、维护 DAG 拓扑图、执行视界分级物理过滤、拦截越界访问
+/// 职责：扫描项目模块、维护 DAG 拓扑图、执行视界分级物理过滤、拦截越界访问
 /// </summary>
 public class DnaManagerService(ILogger<DnaManagerService> logger)
 {
-    // 从 architecture.md 解析 boundary 字段的正则
     private static readonly Regex BoundaryRegex =
         new(@"\*\*边界模式\*\*[：:]\s*`boundary:\s*(hard|soft|shared)`", RegexOptions.IgnoreCase);
 
-    // 从 architecture.md 解析维护者字段
     private static readonly Regex MaintainerRegex =
         new(@"\*\*维护者\*\*[：:]\s*(.+)", RegexOptions.IgnoreCase);
 
-    // 从 dependencies.md 解析依赖的程序集名称（识别 `程序集名/` 或 `程序集名` 格式）
+    // 从 dependencies.md 解析依赖的模块名称
     private static readonly Regex DependencyNameRegex =
         new(@"^\s*[-*]\s+\*?\*?`?([A-Za-z0-9._\-]+)`?\*?\*?", RegexOptions.Multiline);
 
-    // 匹配 ## Public API 段落
-    private static readonly Regex PublicApiSectionRegex =
-        new(@"(##\s+Public API[\s\S]*?)(?=^##\s|\z)", RegexOptions.Multiline);
+    // 匹配职责声明段（支持多种命名：Public API / 职责声明 / 交付契约 / 资产规范）
+    private static readonly Regex ExportsSectionRegex =
+        new(@"(##\s+(?:Public API|职责声明|交付契约|资产规范)[\s\S]*?)(?=^##\s|\z)", RegexOptions.Multiline);
 
     /// <summary>
-    /// 扫描项目根目录，发现所有含 .dna/ 目录的程序集，构建拓扑图
+    /// 扫描项目根目录，发现所有含 .dna/ 目录的模块，构建拓扑图
     /// </summary>
     public TopologyResult ScanTopology(string projectRoot)
     {
@@ -39,57 +37,52 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
             return result;
         }
 
-        // 递归查找所有含 .dna/ 的目录（排除 .git、node_modules、obj、bin 等）
-        var assemblies = FindAssemblyDirectories(projectRoot);
+        var modules = FindModuleDirectories(projectRoot);
 
-        foreach (var assemblyPath in assemblies)
+        foreach (var modulePath in modules)
         {
-            var node = ParseAssemblyNode(assemblyPath);
-            result.Assemblies.Add(node);
-            logger.LogDebug("发现程序集: {Name} ({Boundary})", node.Name, node.Boundary);
+            var node = ParseModuleNode(modulePath);
+            result.Modules.Add(node);
+            logger.LogDebug("发现模块: {Name} ({Boundary})", node.Name, node.Boundary);
         }
 
-        // 构建依赖边
-        foreach (var node in result.Assemblies)
+        foreach (var node in result.Modules)
         {
             foreach (var dep in node.Dependencies)
             {
-                if (result.Assemblies.Any(a => a.Name.Equals(dep, StringComparison.OrdinalIgnoreCase)))
+                if (result.Modules.Any(a => a.Name.Equals(dep, StringComparison.OrdinalIgnoreCase)))
                 {
                     result.Edges.Add(new DependencyEdge { From = node.Name, To = dep });
                 }
             }
         }
 
-        logger.LogInformation("拓扑扫描完成：{Count} 个程序集，{EdgeCount} 条依赖边",
-            result.Assemblies.Count, result.Edges.Count);
+        logger.LogInformation("拓扑扫描完成：{Count} 个模块，{EdgeCount} 条依赖边",
+            result.Modules.Count, result.Edges.Count);
         return result;
     }
 
     /// <summary>
-    /// 对给定程序集列表执行拓扑排序（Kahn 算法），返回执行计划
+    /// 对给定模块列表执行拓扑排序（Kahn 算法），返回执行计划
     /// 被依赖方优先（底层先，上层后）
     /// </summary>
-    public ExecutionPlan GetExecutionPlan(List<string> assemblyNames, string projectRoot)
+    public ExecutionPlan GetExecutionPlan(List<string> moduleNames, string projectRoot)
     {
         var topology = ScanTopology(projectRoot);
         var plan = new ExecutionPlan();
 
-        // 只考虑输入的程序集子集
-        var targetSet = assemblyNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var nodes = topology.Assemblies
+        var targetSet = moduleNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var nodes = topology.Modules
             .Where(a => targetSet.Contains(a.Name))
             .ToList();
 
         if (nodes.Count == 0)
         {
-            plan.OrderedAssemblies = assemblyNames;
+            plan.OrderedModules = moduleNames;
             return plan;
         }
 
-        // 构建子图的入度表和邻接表
-        // 注意：依赖边 A→B 表示 A 依赖 B，执行顺序 B 先于 A
-        // 所以在排序图中，B 指向 A（B 完成后 A 才能执行）
+        // 依赖边 A→B 表示 A 依赖 B，执行顺序 B 先于 A
         var inDegree = nodes.ToDictionary(n => n.Name, _ => 0, StringComparer.OrdinalIgnoreCase);
         var graph = nodes.ToDictionary(n => n.Name, _ => new List<string>(), StringComparer.OrdinalIgnoreCase);
 
@@ -98,13 +91,11 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
             foreach (var dep in node.Dependencies)
             {
                 if (!targetSet.Contains(dep)) continue;
-                // dep 是被依赖方，node 是依赖方；dep 先执行
                 graph[dep].Add(node.Name);
                 inDegree[node.Name]++;
             }
         }
 
-        // Kahn 算法
         var queue = new Queue<string>(inDegree.Where(kv => kv.Value == 0).Select(kv => kv.Key));
         var ordered = new List<string>();
 
@@ -123,50 +114,48 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
 
         if (ordered.Count != nodes.Count)
         {
-            // 存在循环依赖
             var remaining = inDegree.Where(kv => kv.Value > 0).Select(kv => kv.Key).ToList();
             plan.HasCycle = true;
-            plan.CycleDescription = $"检测到循环依赖，涉及程序集：{string.Join(", ", remaining)}。" +
-                                    "请检查这些程序集的 dependencies.md，消除循环引用（可引入事件解耦或提取公共接口到更底层程序集）。";
-            plan.OrderedAssemblies = ordered; // 返回已排序的部分
+            plan.CycleDescription = $"检测到循环依赖，涉及模块：{string.Join(", ", remaining)}。" +
+                                    "请检查这些模块的 dependencies.md，消除循环引用（可提取公共内容到更底层模块）。";
+            plan.OrderedModules = ordered;
         }
         else
         {
-            plan.OrderedAssemblies = ordered;
+            plan.OrderedModules = ordered;
         }
 
-        logger.LogInformation("执行计划生成：{Order}", string.Join(" → ", plan.OrderedAssemblies));
+        logger.LogInformation("执行计划生成：{Order}", string.Join(" → ", plan.OrderedModules));
         return plan;
     }
 
     /// <summary>
     /// 按视界分级物理过滤，返回 AI 被允许访问的上下文内容
     /// </summary>
-    /// <param name="targetAssembly">目标程序集名称</param>
-    /// <param name="currentAssembly">当前正在开发的程序集名称（null 表示查询模式）</param>
+    /// <param name="targetModule">目标模块名称</param>
+    /// <param name="currentModule">当前正在操作的模块名称（null 表示查询模式）</param>
     /// <param name="projectRoot">项目根目录</param>
-    public DnaContext GetAssemblyContext(string targetAssembly, string? currentAssembly, string projectRoot)
+    public DnaContext GetModuleContext(string targetModule, string? currentModule, string projectRoot)
     {
         var topology = ScanTopology(projectRoot);
-        var target = topology.Assemblies
-            .FirstOrDefault(a => a.Name.Equals(targetAssembly, StringComparison.OrdinalIgnoreCase));
+        var target = topology.Modules
+            .FirstOrDefault(a => a.Name.Equals(targetModule, StringComparison.OrdinalIgnoreCase));
 
         if (target == null)
         {
             return new DnaContext
             {
-                AssemblyName = targetAssembly,
+                ModuleName = targetModule,
                 Level = ContextLevel.Unlinked,
-                BlockMessage = $"[拦截] 程序集 '{targetAssembly}' 未在拓扑图中注册。请先执行 register_assembly 或 @coder init 初始化该程序集。"
+                BlockMessage = $"[拦截] 模块 '{targetModule}' 未在拓扑图中注册。请先执行 register_module 初始化该模块。"
             };
         }
 
-        // 确定访问级别
-        var level = DetermineContextLevel(targetAssembly, currentAssembly, topology);
+        var level = DetermineContextLevel(targetModule, currentModule, topology);
 
         var context = new DnaContext
         {
-            AssemblyName = targetAssembly,
+            ModuleName = targetModule,
             Level = level,
             Boundary = target.Boundary
         };
@@ -174,15 +163,14 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
         switch (level)
         {
             case ContextLevel.Unlinked:
-                context.BlockMessage = $"[拦截] 物理隔离。程序集 '{targetAssembly}' 不在当前程序集 '{currentAssembly}' 的依赖链上，无权访问任何文件。";
+                context.BlockMessage = $"[拦截] 物理隔离。模块 '{targetModule}' 不在当前模块 '{currentModule}' 的依赖链上，无权访问任何文件。";
                 break;
 
             case ContextLevel.HardDependency:
-                // 只返回 ## Public API 段
-                context.ArchitectureContent = ExtractPublicApiSection(target.ArchitecturePath);
+                context.ArchitectureContent = ExtractExportsSection(target.ArchitecturePath);
                 if (context.ArchitectureContent == null)
                 {
-                    context.BlockMessage = $"[警告] 程序集 '{targetAssembly}' 的 architecture.md 不存在或缺少 ## Public API 段。请先执行 @coder init 初始化。";
+                    context.BlockMessage = $"[警告] 模块 '{targetModule}' 的 architecture.md 不存在或缺少职责声明段。请先初始化该模块。";
                 }
                 break;
 
@@ -190,7 +178,7 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
                 context.ArchitectureContent = ReadFileOrNull(target.ArchitecturePath);
                 context.PitfallsContent = ReadFileOrNull(target.PitfallsPath);
                 context.DependenciesContent = ReadFileOrNull(target.DependenciesPath);
-                context.SourceFilePaths = GetPublicApiSourceFiles(target.Path);
+                context.ContentFilePaths = GetContentFiles(target.Path);
                 break;
 
             case ContextLevel.Current:
@@ -198,7 +186,7 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
                 context.PitfallsContent = ReadFileOrNull(target.PitfallsPath);
                 context.DependenciesContent = ReadFileOrNull(target.DependenciesPath);
                 context.WipContent = ReadFileOrNull(target.WipPath);
-                context.SourceFilePaths = GetAllSourceFiles(target.Path);
+                context.ContentFilePaths = GetAllContentFiles(target.Path);
                 break;
         }
 
@@ -206,54 +194,52 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
     }
 
     /// <summary>
-    /// 校验程序集 A 调用程序集 B 的 API 是否在白名单内
+    /// 校验模块 A 调用模块 B 的依赖是否在白名单内
     /// </summary>
     public DependencyValidationResult ValidateDependency(
-        string callerAssembly, string calleeAssembly, string? apiName, string projectRoot)
+        string callerModule, string calleeModule, string? apiName, string projectRoot)
     {
         var topology = ScanTopology(projectRoot);
-        var caller = topology.Assemblies
-            .FirstOrDefault(a => a.Name.Equals(callerAssembly, StringComparison.OrdinalIgnoreCase));
+        var caller = topology.Modules
+            .FirstOrDefault(a => a.Name.Equals(callerModule, StringComparison.OrdinalIgnoreCase));
 
         if (caller == null)
             return new DependencyValidationResult
             {
                 IsValid = false,
-                Message = $"调用方程序集 '{callerAssembly}' 未注册。"
+                Message = $"调用方模块 '{callerModule}' 未注册。"
             };
 
-        // 检查依赖声明
-        bool isDeclared = caller.Dependencies.Any(d => d.Equals(calleeAssembly, StringComparison.OrdinalIgnoreCase));
+        bool isDeclared = caller.Dependencies.Any(d => d.Equals(calleeModule, StringComparison.OrdinalIgnoreCase));
 
         if (!isDeclared)
         {
-            var blockMsg = $"[阻断] 依赖模块 {calleeAssembly} 未在 {callerAssembly}/dependencies.md 中声明。\n" +
-                           $"请先在 {callerAssembly}/.dna/dependencies.md 中添加 {calleeAssembly} 的依赖声明，再来续接本任务。";
+            var blockMsg = $"[阻断] 依赖模块 {calleeModule} 未在 {callerModule}/dependencies.md 中声明。\n" +
+                           $"请先在 {callerModule}/.dna/dependencies.md 中添加 {calleeModule} 的依赖声明，再来续接本任务。";
             return new DependencyValidationResult
             {
                 IsValid = false,
-                Message = $"程序集 '{callerAssembly}' 的 dependencies.md 中未声明对 '{calleeAssembly}' 的依赖。",
+                Message = $"模块 '{callerModule}' 的 dependencies.md 中未声明对 '{calleeModule}' 的依赖。",
                 BlockMessage = blockMsg
             };
         }
 
-        // 如果指定了 API 名称，检查是否在 Public API 中
         if (!string.IsNullOrEmpty(apiName))
         {
-            var callee = topology.Assemblies
-                .FirstOrDefault(a => a.Name.Equals(calleeAssembly, StringComparison.OrdinalIgnoreCase));
+            var callee = topology.Modules
+                .FirstOrDefault(a => a.Name.Equals(calleeModule, StringComparison.OrdinalIgnoreCase));
 
             if (callee != null)
             {
-                var publicApiContent = ExtractPublicApiSection(callee.ArchitecturePath);
-                if (publicApiContent != null && !publicApiContent.Contains(apiName))
+                var exportsContent = ExtractExportsSection(callee.ArchitecturePath);
+                if (exportsContent != null && !exportsContent.Contains(apiName))
                 {
-                    var blockMsg = $"[阻断] 依赖模块 {calleeAssembly} 缺少 {apiName} 接口。\n" +
-                                   $"请先通过 @coder dev {calleeAssembly} 补充该接口，再来续接本任务。";
+                    var blockMsg = $"[阻断] 依赖模块 {calleeModule} 的职责声明中缺少 {apiName}。\n" +
+                                   $"请先补充该接口/职责到 {calleeModule} 的 architecture.md，再来续接本任务。";
                     return new DependencyValidationResult
                     {
                         IsValid = false,
-                        Message = $"程序集 '{calleeAssembly}' 的 Public API 中未找到 '{apiName}'。",
+                        Message = $"模块 '{calleeModule}' 的职责声明中未找到 '{apiName}'。",
                         BlockMessage = blockMsg
                     };
                 }
@@ -263,36 +249,36 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
         return new DependencyValidationResult
         {
             IsValid = true,
-            Message = $"依赖校验通过：'{callerAssembly}' → '{calleeAssembly}'" +
+            Message = $"依赖校验通过：'{callerModule}' → '{calleeModule}'" +
                       (apiName != null ? $" API '{apiName}'" : "")
         };
     }
 
     /// <summary>
-    /// 将新程序集注册到拓扑图（创建 .dna/ 目录结构）
+    /// 将新模块注册到拓扑图（创建 .dna/ 目录结构）
     /// </summary>
-    public string RegisterAssembly(string assemblyPath, string projectRoot)
+    public string RegisterModule(string modulePath, string projectRoot)
     {
-        var fullPath = Path.IsPathRooted(assemblyPath)
-            ? assemblyPath
-            : Path.Combine(projectRoot, assemblyPath);
+        var fullPath = Path.IsPathRooted(modulePath)
+            ? modulePath
+            : Path.Combine(projectRoot, modulePath);
 
         if (!Directory.Exists(fullPath))
             return $"错误：目录 '{fullPath}' 不存在。请先创建目录。";
 
         var dnaPath = Path.Combine(fullPath, ".dna");
         if (Directory.Exists(dnaPath))
-            return $"程序集 '{Path.GetFileName(fullPath)}' 已有 .dna/ 目录，无需重复注册。";
+            return $"模块 '{Path.GetFileName(fullPath)}' 已有 .dna/ 目录，无需重复注册。";
 
         Directory.CreateDirectory(dnaPath);
-        logger.LogInformation("已注册程序集: {Path}", fullPath);
-        return $"已注册程序集 '{Path.GetFileName(fullPath)}'，.dna/ 目录已创建于 {dnaPath}。\n" +
-               "请使用 @coder init 初始化完整的 DNA 记忆文件（architecture.md、pitfalls.md 等）。";
+        logger.LogInformation("已注册模块: {Path}", fullPath);
+        return $"已注册模块 '{Path.GetFileName(fullPath)}'，.dna/ 目录已创建于 {dnaPath}。\n" +
+               "请初始化完整的 DNA 记忆文件（architecture.md、pitfalls.md 等）。";
     }
 
     // ── 私有辅助方法 ──────────────────────────────────────────────
 
-    private List<string> FindAssemblyDirectories(string root)
+    private List<string> FindModuleDirectories(string root)
     {
         var result = new List<string>();
         var excludedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -308,7 +294,6 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
                 var dirName = Path.GetFileName(dir);
                 if (excludedDirs.Contains(dirName)) continue;
 
-                // 跳过路径中包含排除目录的
                 if (excludedDirs.Any(ex => dir.Contains(Path.DirectorySeparatorChar + ex + Path.DirectorySeparatorChar)))
                     continue;
 
@@ -325,16 +310,15 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
         return result;
     }
 
-    private AssemblyNode ParseAssemblyNode(string assemblyPath)
+    private ModuleNode ParseModuleNode(string modulePath)
     {
-        var node = new AssemblyNode
+        var node = new ModuleNode
         {
-            Name = Path.GetFileName(assemblyPath),
-            Path = assemblyPath
+            Name = Path.GetFileName(modulePath),
+            Path = modulePath
         };
 
-        // 解析 architecture.md
-        var archPath = Path.Combine(assemblyPath, ".dna", "architecture.md");
+        var archPath = Path.Combine(modulePath, ".dna", "architecture.md");
         if (File.Exists(archPath))
         {
             var content = File.ReadAllText(archPath);
@@ -355,8 +339,7 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
                 node.Maintainer = maintainerMatch.Groups[1].Value.Trim();
         }
 
-        // 解析 dependencies.md
-        var depsPath = Path.Combine(assemblyPath, ".dna", "dependencies.md");
+        var depsPath = Path.Combine(modulePath, ".dna", "dependencies.md");
         if (File.Exists(depsPath))
         {
             node.Dependencies = ParseDependencyNames(File.ReadAllText(depsPath));
@@ -368,7 +351,6 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
     private List<string> ParseDependencyNames(string dependenciesContent)
     {
         var names = new List<string>();
-        // 查找 "## 依赖声明" 或 "## Dependencies" 段落后的列表项
         var matches = DependencyNameRegex.Matches(dependenciesContent);
         foreach (Match m in matches)
         {
@@ -379,64 +361,73 @@ public class DnaManagerService(ILogger<DnaManagerService> logger)
         return names.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private ContextLevel DetermineContextLevel(string targetAssembly, string? currentAssembly, TopologyResult topology)
+    private ContextLevel DetermineContextLevel(string targetModule, string? currentModule, TopologyResult topology)
     {
-        if (currentAssembly == null)
-            return ContextLevel.Current; // 无当前程序集时，视为查询模式，返回完整上下文
+        if (currentModule == null)
+            return ContextLevel.Current; // 无当前模块时，视为查询模式，返回完整上下文
 
-        if (targetAssembly.Equals(currentAssembly, StringComparison.OrdinalIgnoreCase))
+        if (targetModule.Equals(currentModule, StringComparison.OrdinalIgnoreCase))
             return ContextLevel.Current;
 
-        var target = topology.Assemblies
-            .FirstOrDefault(a => a.Name.Equals(targetAssembly, StringComparison.OrdinalIgnoreCase));
+        var target = topology.Modules
+            .FirstOrDefault(a => a.Name.Equals(targetModule, StringComparison.OrdinalIgnoreCase));
 
         if (target == null) return ContextLevel.Unlinked;
 
-        // shared 边界：任何程序集均可访问
+        // shared 边界：任何模块均可访问
         if (target.Boundary == BoundaryMode.Shared)
             return ContextLevel.SharedOrSoft;
 
-        var current = topology.Assemblies
-            .FirstOrDefault(a => a.Name.Equals(currentAssembly, StringComparison.OrdinalIgnoreCase));
+        var current = topology.Modules
+            .FirstOrDefault(a => a.Name.Equals(currentModule, StringComparison.OrdinalIgnoreCase));
 
         if (current == null) return ContextLevel.Unlinked;
 
         bool isDeclaredDependency = current.Dependencies
-            .Any(d => d.Equals(targetAssembly, StringComparison.OrdinalIgnoreCase));
+            .Any(d => d.Equals(targetModule, StringComparison.OrdinalIgnoreCase));
 
         if (!isDeclaredDependency)
             return ContextLevel.Unlinked;
 
-        // soft 边界依赖：SharedOrSoft 级别
         if (target.Boundary == BoundaryMode.Soft)
             return ContextLevel.SharedOrSoft;
 
-        // hard 边界依赖：HardDependency 级别
         return ContextLevel.HardDependency;
     }
 
-    private string? ExtractPublicApiSection(string architecturePath)
+    private string? ExtractExportsSection(string architecturePath)
     {
         if (!File.Exists(architecturePath)) return null;
         var content = File.ReadAllText(architecturePath);
-        var match = PublicApiSectionRegex.Match(content);
+        var match = ExportsSectionRegex.Match(content);
         return match.Success ? match.Value.Trim() : null;
     }
 
-    private List<string> GetAllSourceFiles(string assemblyPath)
+    private static readonly HashSet<string> ExcludedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        if (!Directory.Exists(assemblyPath)) return [];
-        return Directory.EnumerateFiles(assemblyPath, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)
-                     && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar))
+        ".dll", ".exe", ".pdb", ".cache", ".nupkg", ".suo", ".user",
+        ".DS_Store", ".meta" // Unity meta files are kept separate
+    };
+
+    private static readonly HashSet<string> ExcludedContentDirs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "obj", "bin", ".git", ".vs", ".idea", "node_modules", "__pycache__", ".dna"
+    };
+
+    private List<string> GetAllContentFiles(string modulePath)
+    {
+        if (!Directory.Exists(modulePath)) return [];
+        return Directory.EnumerateFiles(modulePath, "*", SearchOption.AllDirectories)
+            .Where(f => !ExcludedContentDirs.Any(ex =>
+                            f.Contains(Path.DirectorySeparatorChar + ex + Path.DirectorySeparatorChar))
+                     && !ExcludedFileExtensions.Contains(Path.GetExtension(f)))
             .ToList();
     }
 
-    private List<string> GetPublicApiSourceFiles(string assemblyPath)
+    private List<string> GetContentFiles(string modulePath)
     {
-        // 对于 soft/shared 边界，返回包含 public 声明的源文件路径
-        // 简化实现：返回所有非 internal/private 的文件（实际由 Roslyn 精确过滤）
-        return GetAllSourceFiles(assemblyPath);
+        // SharedOrSoft 边界：返回与职责相关的内容文件
+        return GetAllContentFiles(modulePath);
     }
 
     private static string? ReadFileOrNull(string path)

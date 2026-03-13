@@ -1,33 +1,34 @@
 namespace AgenticOs.Models;
 
 /// <summary>
-/// 程序集边界模式，对应 architecture.md 中的 boundary 字段
+/// 模块边界模式，对应 architecture.md 中的 boundary 字段
 /// </summary>
 public enum BoundaryMode
 {
-    /// <summary>默认硬边界：只能访问 Public API 签名，禁止读取源码</summary>
+    /// <summary>默认硬边界：只能访问职责声明段，禁止读取内部内容</summary>
     Hard,
-    /// <summary>软边界：同层 feature 间受控共享，可读取 Public API 源码</summary>
+    /// <summary>软边界：同层模块间受控共享，可读取职责声明相关文件</summary>
     Soft,
-    /// <summary>共享层：任何程序集均可引用，可读取 Public API 源码</summary>
+    /// <summary>共享层：任何模块均可引用，可读取职责声明相关文件</summary>
     Shared
 }
 
 /// <summary>
-/// 程序集节点，代表 DNA 拓扑图中的一个节点
+/// 模块节点，代表 DNA 拓扑图中的一个工作区单元。
+/// 模块可以是代码、美术资产、策划文档、音视频等任何类型的工作内容。
 /// </summary>
-public class AssemblyNode
+public class ModuleNode
 {
-    /// <summary>程序集名称（目录名）</summary>
+    /// <summary>模块名称（目录名）</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>程序集根目录的绝对路径</summary>
+    /// <summary>模块根目录的绝对路径</summary>
     public string Path { get; set; } = string.Empty;
 
     /// <summary>边界模式，从 architecture.md 的 boundary 字段读取</summary>
     public BoundaryMode Boundary { get; set; } = BoundaryMode.Hard;
 
-    /// <summary>该程序集依赖的其他程序集名称列表（从 dependencies.md 解析）</summary>
+    /// <summary>该模块依赖的其他模块名称列表（从 dependencies.md 解析）</summary>
     public List<string> Dependencies { get; set; } = [];
 
     /// <summary>维护者（从 architecture.md 的 维护者 字段读取，可为空）</summary>

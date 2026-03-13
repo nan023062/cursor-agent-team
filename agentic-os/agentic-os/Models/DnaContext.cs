@@ -1,27 +1,27 @@
 namespace AgenticOs.Models;
 
 /// <summary>
-/// 视界访问级别，对应 AGENT.md 中的 Context Window Access Level
+/// 视界访问级别，对应上下文加载协议中的 Context Window Access Level
 /// </summary>
 public enum ContextLevel
 {
-    /// <summary>当前程序集：.dna/ 全部 + 全部源码路径</summary>
+    /// <summary>当前模块：.dna/ 全部 + 全部内容文件路径</summary>
     Current,
-    /// <summary>共享层/软边界：.dna/ 全部 + Public API 源码路径</summary>
+    /// <summary>共享层/软边界：.dna/ 全部 + 职责声明相关文件路径</summary>
     SharedOrSoft,
-    /// <summary>硬边界依赖：仅 architecture.md 的 ## Public API 段</summary>
+    /// <summary>硬边界依赖：仅 architecture.md 的职责声明段</summary>
     HardDependency,
     /// <summary>非依赖模块：无权访问，物理隔离</summary>
     Unlinked
 }
 
 /// <summary>
-/// 程序集 DNA 上下文，由 get_assembly_context 工具按视界分级过滤后返回
+/// 模块 DNA 上下文，由 get_module_context 工具按视界分级过滤后返回
 /// </summary>
 public class DnaContext
 {
-    /// <summary>程序集名称</summary>
-    public string AssemblyName { get; set; } = string.Empty;
+    /// <summary>模块名称</summary>
+    public string ModuleName { get; set; } = string.Empty;
 
     /// <summary>访问级别</summary>
     public ContextLevel Level { get; set; }
@@ -32,7 +32,7 @@ public class DnaContext
     /// <summary>
     /// architecture.md 内容。
     /// - Current/SharedOrSoft：完整内容
-    /// - HardDependency：仅 ## Public API 段
+    /// - HardDependency：仅职责声明段（Public API / 交付契约 / 资产规范）
     /// - Unlinked：null（拦截）
     /// </summary>
     public string? ArchitectureContent { get; set; }
@@ -57,12 +57,12 @@ public class DnaContext
     public string? WipContent { get; set; }
 
     /// <summary>
-    /// 源码文件路径列表（物理过滤后）。
-    /// - Current：全部 .cs 文件路径
-    /// - SharedOrSoft：Public API 相关源文件路径（需要 AI 进一步加载）
+    /// 内容文件路径列表（物理过滤后）。
+    /// - Current：全部内容文件路径
+    /// - SharedOrSoft：职责声明相关文件路径
     /// - HardDependency/Unlinked：空列表
     /// </summary>
-    public List<string> SourceFilePaths { get; set; } = [];
+    public List<string> ContentFilePaths { get; set; } = [];
 
     /// <summary>越界拦截消息（当 Level = Unlinked 时填充）</summary>
     public string? BlockMessage { get; set; }
@@ -76,8 +76,8 @@ public class DnaContext
 /// </summary>
 public class TopologyResult
 {
-    /// <summary>所有已注册的程序集节点</summary>
-    public List<AssemblyNode> Assemblies { get; set; } = [];
+    /// <summary>所有已注册的模块节点</summary>
+    public List<ModuleNode> Modules { get; set; } = [];
 
     /// <summary>依赖边列表（from → to 表示 from 依赖 to）</summary>
     public List<DependencyEdge> Edges { get; set; } = [];
@@ -106,8 +106,8 @@ public class DependencyEdge
 /// </summary>
 public class ExecutionPlan
 {
-    /// <summary>按执行顺序排列的程序集名称列表（被依赖方优先）</summary>
-    public List<string> OrderedAssemblies { get; set; } = [];
+    /// <summary>按执行顺序排列的模块名称列表（被依赖方优先）</summary>
+    public List<string> OrderedModules { get; set; } = [];
 
     /// <summary>是否检测到循环依赖</summary>
     public bool HasCycle { get; set; }
@@ -115,7 +115,7 @@ public class ExecutionPlan
     /// <summary>循环依赖描述（HasCycle 为 true 时填充）</summary>
     public string? CycleDescription { get; set; }
 
-    /// <summary>各程序集的变更类型说明</summary>
+    /// <summary>各模块的变更类型说明</summary>
     public Dictionary<string, string> ChangeTypes { get; set; } = [];
 }
 
@@ -130,6 +130,6 @@ public class DependencyValidationResult
     /// <summary>校验消息</summary>
     public string Message { get; set; } = string.Empty;
 
-    /// <summary>被拦截时的标准阻断消息（格式与 AGENT.md 一致）</summary>
+    /// <summary>被拦截时的标准阻断消息</summary>
     public string? BlockMessage { get; set; }
 }

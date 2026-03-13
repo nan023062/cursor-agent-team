@@ -39,8 +39,8 @@
                                         <StackPanel Spacing="6">
                                             <TextBlock Text="{Binding Header}" FontWeight="Bold" Foreground="#e94560"/>
                                             <TextBlock>
-                                                <Run Text="程序集: " Foreground="#888"/>
-                                                <Run Text="{Binding AssemblyName}" Foreground="White"/>
+                                                <Run Text="模块: " Foreground="#888"/>
+                                                <Run Text="{Binding ModuleName}" Foreground="White"/>
                                             </TextBlock>
                                             <TextBlock Text="{Binding TaskDescription}" Foreground="#a0a0a0" TextWrapping="Wrap"/>
                                             <TextBlock>

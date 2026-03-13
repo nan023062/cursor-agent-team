@@ -27,7 +27,7 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
     /// </summary>
     public string SuspendAndPush(
         string projectRoot,
-        string currentAssembly,
+        string currentModule,
         string taskDescription,
         string suspendReason,
         string contextSummary,
@@ -36,10 +36,9 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
     {
         var stack = LoadCallStack(projectRoot);
 
-        // 如果栈顶已有该程序集的任务，更新它；否则创建新帧
         var existingFrame = stack.Top;
         if (existingFrame != null &&
-            existingFrame.AssemblyName.Equals(currentAssembly, StringComparison.OrdinalIgnoreCase) &&
+            existingFrame.ModuleName.Equals(currentModule, StringComparison.OrdinalIgnoreCase) &&
             existingFrame.Status == TaskFrameStatus.Running)
         {
             existingFrame.Status = TaskFrameStatus.Suspended;
@@ -53,7 +52,7 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
         {
             var frame = new TaskFrame
             {
-                AssemblyName = currentAssembly,
+                ModuleName = currentModule,
                 TaskDescription = taskDescription,
                 SuspendReason = suspendReason,
                 ResumeCondition = resumeCondition,
@@ -66,17 +65,17 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
 
         SaveCallStack(projectRoot, stack);
 
-        logger.LogInformation("任务已挂起: {Assembly} (栈深度: {Depth})", currentAssembly, stack.Frames.Count);
+        logger.LogInformation("任务已挂起: {Module} (栈深度: {Depth})", currentModule, stack.Frames.Count);
 
         return $"""
                 [调用栈] 任务已挂起并入栈 ✓
                 
-                挂起程序集: {currentAssembly}
+                挂起模块: {currentModule}
                 挂起原因: {suspendReason}
                 恢复条件: {resumeCondition}
                 当前栈深度: {stack.Frames.Count}
                 
-                上下文已保存。请切换到目标程序集继续开发。
+                上下文已保存。请切换到目标模块继续工作。
                 完成后调用 complete_and_pop 恢复本任务。
                 """;
     }
@@ -84,7 +83,7 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
     /// <summary>
     /// 完成当前任务并弹出调用栈（Pop），恢复上一层任务的上下文
     /// </summary>
-    public (string Message, TaskFrame? RestoredFrame) CompleteAndPop(string projectRoot, string completedAssembly)
+    public (string Message, TaskFrame? RestoredFrame) CompleteAndPop(string projectRoot, string completedModule)
     {
         var stack = LoadCallStack(projectRoot);
 
@@ -95,11 +94,10 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
 
         var top = stack.Top!;
 
-        // 验证栈顶是否为期望完成的程序集
-        if (!top.AssemblyName.Equals(completedAssembly, StringComparison.OrdinalIgnoreCase))
+        if (!top.ModuleName.Equals(completedModule, StringComparison.OrdinalIgnoreCase))
         {
-            return ($"[警告] 栈顶任务是 '{top.AssemblyName}'，但你尝试完成的是 '{completedAssembly}'。\n" +
-                    $"请先完成 '{top.AssemblyName}' 的任务，再调用 complete_and_pop。", null);
+            return ($"[警告] 栈顶任务是 '{top.ModuleName}'，但你尝试完成的是 '{completedModule}'。\n" +
+                    $"请先完成 '{top.ModuleName}' 的任务，再调用 complete_and_pop。", null);
         }
 
         top.Status = TaskFrameStatus.Completed;
@@ -107,12 +105,12 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
         stack.Frames.RemoveAt(stack.Frames.Count - 1);
         SaveCallStack(projectRoot, stack);
 
-        logger.LogInformation("任务已完成并出栈: {Assembly} (剩余栈深度: {Depth})", completedAssembly, stack.Frames.Count);
+        logger.LogInformation("任务已完成并出栈: {Module} (剩余栈深度: {Depth})", completedModule, stack.Frames.Count);
 
         if (stack.IsEmpty)
         {
             return ($"""
-                     [调用栈] 程序集 '{completedAssembly}' 开发完成 ✓
+                     [调用栈] 模块 '{completedModule}' 任务完成 ✓
                      
                      调用栈已清空，所有任务均已完成！
                      """, null);
@@ -120,10 +118,10 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
 
         var restored = stack.Top!;
         var message = $"""
-                       [调用栈] 程序集 '{completedAssembly}' 开发完成 ✓
+                       [调用栈] 模块 '{completedModule}' 任务完成 ✓
                        
                        ═══ 恢复上层任务 ═══
-                       程序集: {restored.AssemblyName}
+                       模块: {restored.ModuleName}
                        任务: {restored.TaskDescription}
                        挂起原因（已解决）: {restored.SuspendReason}
                        
@@ -154,14 +152,14 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
     /// <summary>
     /// 更新子任务状态（标记完成/未完成）
     /// </summary>
-    public string UpdateTaskStatus(string projectRoot, string assemblyName, int subTaskIndex, bool completed)
+    public string UpdateTaskStatus(string projectRoot, string moduleName, int subTaskIndex, bool completed)
     {
         var stack = LoadCallStack(projectRoot);
         var frame = stack.Frames
-            .FirstOrDefault(f => f.AssemblyName.Equals(assemblyName, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(f => f.ModuleName.Equals(moduleName, StringComparison.OrdinalIgnoreCase));
 
         if (frame == null)
-            return $"调用栈中未找到程序集 '{assemblyName}' 的任务帧。";
+            return $"调用栈中未找到模块 '{moduleName}' 的任务帧。";
 
         if (subTaskIndex < 0 || subTaskIndex >= frame.SubTasks.Count)
             return $"子任务索引 {subTaskIndex} 超出范围（共 {frame.SubTasks.Count} 个子任务）。";
@@ -194,7 +192,7 @@ public class TaskSchedulerService(ILogger<TaskSchedulerService> logger)
             var frame = stack.Frames[i];
             var label = i == stack.Frames.Count - 1 ? "### 栈顶（当前执行）" : $"### 栈帧 #{stack.Frames.Count - 1 - i}（已挂起）";
             sb.AppendLine(label);
-            sb.AppendLine($"- 程序集: {frame.AssemblyName}");
+            sb.AppendLine($"- 模块: {frame.ModuleName}");
             sb.AppendLine($"- 任务: {frame.TaskDescription}");
             sb.AppendLine($"- 状态: {frame.Status}");
             if (!string.IsNullOrEmpty(frame.SuspendReason))

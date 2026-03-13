@@ -10,7 +10,7 @@ namespace AgenticOs.Services;
 
 /// <summary>
 /// 工作区执行器服务
-/// 职责：文件读写、Roslyn Public API 精确提取、pitfall/changelog 结构化写入
+/// 职责：文件读写、C# Public API 精确提取（Roslyn）、pitfall/changelog 结构化写入
 /// </summary>
 public class WorkspaceService(ILogger<WorkspaceService> logger)
 {
@@ -18,28 +18,27 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
     private static readonly Regex PublicApiSectionRegex =
         new(@"(##\s+Public API\s*\n)([\s\S]*?)(?=\n##\s|\z)", RegexOptions.Multiline);
 
-    // 匹配 pitfalls.md 中的最后一个条目，用于追加
     private static readonly Regex LastPitfallEntryRegex =
         new(@"(---\s*$)", RegexOptions.Multiline | RegexOptions.RightToLeft);
 
     /// <summary>
-    /// 使用 Roslyn 从 C# 源文件中精确提取所有 public 成员签名
-    /// 100% 准确，不会漏掉继承成员或复杂泛型
+    /// 使用 Roslyn 从 C# 源文件中精确提取所有 public 成员签名。
+    /// 注意：此功能专用于 C# 代码模块，非代码模块应由 AI 手动维护职责声明段。
     /// </summary>
-    public async Task<string> ExtractPublicApiAsync(string assemblyPath)
+    public async Task<string> ExtractPublicApiAsync(string modulePath)
     {
-        if (!Directory.Exists(assemblyPath))
-            return $"错误：目录 '{assemblyPath}' 不存在。";
+        if (!Directory.Exists(modulePath))
+            return $"错误：目录 '{modulePath}' 不存在。";
 
-        var csFiles = Directory.EnumerateFiles(assemblyPath, "*.cs", SearchOption.AllDirectories)
+        var csFiles = Directory.EnumerateFiles(modulePath, "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)
                      && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar))
             .ToList();
 
         if (csFiles.Count == 0)
-            return "未找到任何 .cs 源文件。";
+            return "未找到任何 .cs 源文件。此工具仅适用于 C# 代码模块。";
 
-        logger.LogInformation("Roslyn 扫描 {Count} 个 C# 文件: {Path}", csFiles.Count, assemblyPath);
+        logger.LogInformation("Roslyn 扫描 {Count} 个 C# 文件: {Path}", csFiles.Count, modulePath);
 
         var allSignatures = new List<(string GroupComment, string Signature)>();
 
@@ -56,7 +55,6 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
         if (allSignatures.Count == 0)
             return "未发现任何 public 成员。";
 
-        // 按分组注释聚合，生成标准 csharp 签名块
         var sb = new StringBuilder();
         sb.AppendLine("## Public API");
         sb.AppendLine("```csharp");
@@ -82,26 +80,24 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
     /// <summary>
     /// 将提取的 Public API 写入 architecture.md 的 ## Public API 段
     /// </summary>
-    public async Task<string> WritePublicApiToArchitectureAsync(string assemblyPath, string publicApiContent)
+    public async Task<string> WritePublicApiToArchitectureAsync(string modulePath, string publicApiContent)
     {
-        var archPath = Path.Combine(assemblyPath, ".dna", "architecture.md");
+        var archPath = Path.Combine(modulePath, ".dna", "architecture.md");
         if (!File.Exists(archPath))
-            return $"错误：{archPath} 不存在。请先执行 @coder init 初始化。";
+            return $"错误：{archPath} 不存在。请先初始化该模块。";
 
         var content = await File.ReadAllTextAsync(archPath);
 
         if (PublicApiSectionRegex.IsMatch(content))
         {
-            // 替换现有 Public API 段
             content = PublicApiSectionRegex.Replace(content, m => m.Groups[1].Value + publicApiContent.TrimStart() + "\n");
         }
         else
         {
-            // 追加到文件末尾
             content = content.TrimEnd() + "\n\n" + publicApiContent;
         }
 
-        await File.WriteAllTextAsync(archPath, content, new UTF8Encoding(true)); // UTF-8 BOM
+        await File.WriteAllTextAsync(archPath, content, new UTF8Encoding(true));
         logger.LogInformation("Public API 已写入: {Path}", archPath);
         return $"Public API 已成功写入 {archPath}";
     }
@@ -110,7 +106,7 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
     /// 结构化写入 pitfall 条目到 pitfalls.md，并同步更新 pitfall-index.md
     /// </summary>
     public async Task<string> WritePitfallAsync(
-        string assemblyPath,
+        string modulePath,
         string projectRoot,
         string tag,
         string rootCause,
@@ -118,12 +114,12 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
         string scope,
         string? summary = null)
     {
-        var pitfallsPath = Path.Combine(assemblyPath, ".dna", "pitfalls.md");
+        var pitfallsPath = Path.Combine(modulePath, ".dna", "pitfalls.md");
         if (!File.Exists(pitfallsPath))
-            return $"错误：{pitfallsPath} 不存在。请先执行 @coder init 初始化。";
+            return $"错误：{pitfallsPath} 不存在。请先初始化该模块。";
 
         var date = DateTime.Now.ToString("yyyy-MM-dd");
-        var assemblyName = Path.GetFileName(assemblyPath);
+        var moduleName = Path.GetFileName(modulePath);
         var shortSummary = summary ?? $"{rootCause.Split('。')[0]}";
 
         var entry = $"""
@@ -143,16 +139,15 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
         content = content.TrimEnd() + "\n" + entry;
         await File.WriteAllTextAsync(pitfallsPath, content, new UTF8Encoding(true));
 
-        // 同步更新 pitfall-index.md（如果存在）
         var indexPath = Path.Combine(projectRoot, "coder", "pitfall-index.md");
         if (File.Exists(indexPath))
         {
-            var indexLine = $"{date}|`{tag}`|{assemblyName}|{shortSummary}\n";
+            var indexLine = $"{date}|`{tag}`|{moduleName}|{shortSummary}\n";
             await File.AppendAllTextAsync(indexPath, indexLine);
             logger.LogDebug("pitfall-index.md 已更新");
         }
 
-        logger.LogInformation("Pitfall 已写入: {Assembly} [{Tag}]", assemblyName, tag);
+        logger.LogInformation("Pitfall 已写入: {Module} [{Tag}]", moduleName, tag);
         return $"Pitfall 已写入 {pitfallsPath}\n标签: {tag}\n摘要: {shortSummary}";
     }
 
@@ -160,30 +155,28 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
     /// 追加变更记录到 changelog.md
     /// </summary>
     public async Task<string> WriteChangelogAsync(
-        string assemblyPath,
+        string modulePath,
         string changeType,
         string description,
         bool isBreaking = false,
-        string? relatedAssemblies = null)
+        string? relatedModules = null)
     {
-        var changelogPath = Path.Combine(assemblyPath, ".dna", "changelog.md");
+        var changelogPath = Path.Combine(modulePath, ".dna", "changelog.md");
         if (!File.Exists(changelogPath))
-            return $"错误：{changelogPath} 不存在。请先执行 @coder init 初始化。";
+            return $"错误：{changelogPath} 不存在。请先初始化该模块。";
 
         var date = DateTime.Now.ToString("yyyy-MM-dd");
         var breakingTag = isBreaking ? " [BREAKING]" : "";
-        var crossTag = !string.IsNullOrEmpty(relatedAssemblies) ? $" [跨程序集: {relatedAssemblies}]" : "";
+        var crossTag = !string.IsNullOrEmpty(relatedModules) ? $" [跨模块: {relatedModules}]" : "";
 
         var entry = $"\n- **{date}** [{changeType}]{breakingTag}{crossTag}: {description}";
 
         var content = await File.ReadAllTextAsync(changelogPath);
-        // 找到第一个 ## 段落后追加
         var insertIndex = content.IndexOf("\n## ", StringComparison.Ordinal);
         if (insertIndex < 0)
             content = content.TrimEnd() + "\n" + entry;
         else
         {
-            // 在第一个 ## 段落后的第一行插入
             var afterHeader = content.IndexOf('\n', insertIndex + 1);
             if (afterHeader < 0)
                 content += entry;
@@ -192,31 +185,30 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
         }
 
         await File.WriteAllTextAsync(changelogPath, content, new UTF8Encoding(true));
-        logger.LogInformation("Changelog 已写入: {Assembly} [{Type}]{Breaking}",
-            Path.GetFileName(assemblyPath), changeType, isBreaking ? " BREAKING" : "");
+        logger.LogInformation("Changelog 已写入: {Module} [{Type}]{Breaking}",
+            Path.GetFileName(modulePath), changeType, isBreaking ? " BREAKING" : "");
 
         return $"变更记录已写入 {changelogPath}\n类型: [{changeType}]{breakingTag}{crossTag}";
     }
 
     /// <summary>
-    /// 一次性读取程序集的完整 .dna/ 上下文（按上下文加载协议顺序组装）
+    /// 一次性读取模块的完整 .dna/ 上下文（按上下文加载协议顺序组装）
     /// </summary>
-    public async Task<string> ReadDnaAsync(string assemblyPath)
+    public async Task<string> ReadDnaAsync(string modulePath)
     {
-        if (!Directory.Exists(assemblyPath))
-            return $"错误：目录 '{assemblyPath}' 不存在。";
+        if (!Directory.Exists(modulePath))
+            return $"错误：目录 '{modulePath}' 不存在。";
 
-        var dnaPath = Path.Combine(assemblyPath, ".dna");
+        var dnaPath = Path.Combine(modulePath, ".dna");
         if (!Directory.Exists(dnaPath))
-            return $"错误：{dnaPath} 不存在。请先执行 @coder init 初始化。";
+            return $"错误：{dnaPath} 不存在。请先初始化该模块。";
 
-        var assemblyName = Path.GetFileName(assemblyPath);
+        var moduleName = Path.GetFileName(modulePath);
         var sb = new StringBuilder();
-        sb.AppendLine($"# DNA 上下文 — {assemblyName}");
+        sb.AppendLine($"# DNA 上下文 — {moduleName}");
         sb.AppendLine($"> 加载时间: {DateTime.Now:yyyy-MM-dd HH:mm}");
         sb.AppendLine();
 
-        // 按 AGENT.md 上下文加载协议顺序
         await AppendFileSection(sb, Path.Combine(dnaPath, "architecture.md"), "## architecture.md");
         await AppendFileSection(sb, Path.Combine(dnaPath, "pitfalls.md"), "## pitfalls.md");
         await AppendFileSection(sb, Path.Combine(dnaPath, "dependencies.md"), "## dependencies.md");
@@ -232,7 +224,6 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
     {
         var signatures = new List<(string, string)>();
 
-        // 提取所有 public 类型声明
         foreach (var typeDecl in root.DescendantNodes().OfType<BaseTypeDeclarationSyntax>())
         {
             if (!IsPublic(typeDecl.Modifiers)) continue;
@@ -257,7 +248,6 @@ public class WorkspaceService(ILogger<WorkspaceService> logger)
 
             signatures.Add((typeName, $"{modifiers}{typeKind} {typeName}{typeParams}{baseList};"));
 
-            // 提取类型内部的 public 成员
             if (typeDecl is TypeDeclarationSyntax typeWithMembers)
             {
                 foreach (var member in typeWithMembers.Members)

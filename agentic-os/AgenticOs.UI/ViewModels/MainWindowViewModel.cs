@@ -83,7 +83,6 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
-            // 调用栈
             var stack = _scheduler.GetCallStack(_projectRoot);
             CallStackFrames.Clear();
             if (!stack.IsEmpty)
@@ -95,14 +94,13 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
 
-            // 拓扑图
             var topology = _dnaManager.ScanTopology(_projectRoot);
             TopologyNodes.Clear();
-            foreach (var a in topology.Assemblies)
+            foreach (var m in topology.Modules)
             {
-                TopologyNodes.Add(new TopologyNodeViewModel(a));
+                TopologyNodes.Add(new TopologyNodeViewModel(m));
             }
-            TopologySummary = $"共 {topology.Assemblies.Count} 个程序集，{topology.Edges.Count} 条依赖边 · {topology.ScannedAt:yyyy-MM-dd HH:mm}";
+            TopologySummary = $"共 {topology.Modules.Count} 个模块，{topology.Edges.Count} 条依赖边 · {topology.ScannedAt:yyyy-MM-dd HH:mm}";
 
             StatusText = $"已刷新 · {DateTime.Now:HH:mm:ss}";
         }
@@ -138,7 +136,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
 public class TaskFrameViewModel
 {
-    public string AssemblyName { get; }
+    public string ModuleName { get; }
     public string TaskDescription { get; }
     public string StatusText { get; }
     public string? SuspendReason { get; }
@@ -149,7 +147,7 @@ public class TaskFrameViewModel
 
     public TaskFrameViewModel(TaskFrame frame, bool isTop)
     {
-        AssemblyName = frame.AssemblyName;
+        ModuleName = frame.ModuleName;
         TaskDescription = frame.TaskDescription;
         StatusText = frame.Status.ToString();
         SuspendReason = frame.SuspendReason;
@@ -169,7 +167,7 @@ public class TopologyNodeViewModel
     public string Dependencies { get; }
     public string? Maintainer { get; }
 
-    public TopologyNodeViewModel(AssemblyNode node)
+    public TopologyNodeViewModel(ModuleNode node)
     {
         Name = node.Name;
         Boundary = node.Boundary.ToString();

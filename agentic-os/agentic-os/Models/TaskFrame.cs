@@ -14,28 +14,28 @@ public enum TaskFrameStatus
 }
 
 /// <summary>
-/// 调用栈中的单个任务帧，代表一个被挂起的程序集开发任务
+/// 调用栈中的单个任务帧，代表一个被挂起的模块工作任务
 /// </summary>
 public class TaskFrame
 {
     /// <summary>唯一标识符</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
 
-    /// <summary>目标程序集名称</summary>
-    public string AssemblyName { get; set; } = string.Empty;
+    /// <summary>目标模块名称</summary>
+    public string ModuleName { get; set; } = string.Empty;
 
     /// <summary>任务需求描述</summary>
     public string TaskDescription { get; set; } = string.Empty;
 
-    /// <summary>挂起原因（缺少哪个接口，依赖哪个程序集）</summary>
+    /// <summary>挂起原因（缺少哪个接口，依赖哪个模块）</summary>
     public string? SuspendReason { get; set; }
 
-    /// <summary>恢复条件（例如：等待 xxx 程序集的 PublicAPI 包含 yyy 方法）</summary>
+    /// <summary>恢复条件（例如：等待 xxx 模块的职责声明包含 yyy）</summary>
     public string? ResumeCondition { get; set; }
 
     /// <summary>
     /// 上下文摘要：挂起时 AI 当前的关键状态，供恢复时重建注意力。
-    /// 例如：已完成的子任务、当前正在实现的方法名、关键设计决策等。
+    /// 例如：已完成的子任务、当前正在处理的内容、关键设计决策等。
     /// </summary>
     public string ContextSummary { get; set; } = string.Empty;
 

@@ -12,13 +12,13 @@ namespace AgenticOs.Cli;
 ///   agentic-os cli [子命令] [参数...]
 ///
 /// 子命令列表：
-///   topology  [projectRoot]              — 打印程序集拓扑图
-///   stack     [projectRoot]              — 查看当前调用栈
-///   context   [assemblyName] [projectRoot] — 查看程序集 DNA 上下文摘要
-///   plan      [assembly1,assembly2,...] [projectRoot] — 生成执行计划
-///   validate  [caller] [callee] [projectRoot] — 校验依赖关系
-///   dna       [assemblyPath]             — 读取程序集完整 DNA
-///   help                                 — 显示帮助
+///   topology  [projectRoot]                    — 打印模块拓扑图
+///   stack     [projectRoot]                    — 查看当前调用栈
+///   context   [moduleName] [projectRoot]       — 查看模块 DNA 上下文摘要
+///   plan      [module1,module2,...] [projectRoot] — 生成执行计划
+///   validate  [caller] [callee] [projectRoot]  — 校验依赖关系
+///   dna       [modulePath]                     — 读取模块完整 DNA
+///   help                                       — 显示帮助
 /// </summary>
 public class CliHandler(
     DnaManagerService dnaManager,
@@ -35,7 +35,6 @@ public class CliHandler(
 
     public async Task<int> RunAsync(string[] args)
     {
-        // args[0] 已经是 "cli"，从 args[1] 开始是子命令
         var subCommand = args.Length > 1 ? args[1].ToLower() : "help";
 
         try
@@ -63,7 +62,6 @@ public class CliHandler(
 
     private int RunTopology(string[] args)
     {
-        // agentic-os cli topology [projectRoot]
         var root = args.Length > 2 ? args[2] : null;
         var projectRoot = config.Resolve(root);
 
@@ -71,17 +69,16 @@ public class CliHandler(
 
         var result = dnaManager.ScanTopology(projectRoot);
 
-        if (result.Assemblies.Count == 0)
+        if (result.Modules.Count == 0)
         {
-            WriteWarning("未发现任何含 .dna/ 目录的程序集。请先执行 @coder init 初始化程序集。");
+            WriteWarning("未发现任何含 .dna/ 目录的模块。请先初始化模块（创建 .dna/ 目录）。");
             return 0;
         }
 
-        Console.WriteLine($"  共 {result.Assemblies.Count} 个程序集，{result.Edges.Count} 条依赖边");
+        Console.WriteLine($"  共 {result.Modules.Count} 个模块，{result.Edges.Count} 条依赖边");
         Console.WriteLine();
 
-        // 按边界类型分组显示
-        var groups = result.Assemblies.GroupBy(a => a.Boundary).OrderBy(g => g.Key);
+        var groups = result.Modules.GroupBy(a => a.Boundary).OrderBy(g => g.Key);
         foreach (var group in groups)
         {
             var icon = group.Key switch
@@ -91,18 +88,17 @@ public class CliHandler(
                 _ => "◆"
             };
             WriteSection($"{icon} {group.Key} 边界（{group.Count()} 个）");
-            foreach (var assembly in group.OrderBy(a => a.Name))
+            foreach (var module in group.OrderBy(a => a.Name))
             {
-                var deps = assembly.Dependencies.Count > 0
-                    ? $"  → [{string.Join(", ", assembly.Dependencies)}]"
+                var deps = module.Dependencies.Count > 0
+                    ? $"  → [{string.Join(", ", module.Dependencies)}]"
                     : "";
-                var maintainer = assembly.Maintainer != null ? $"  @{assembly.Maintainer}" : "";
-                Console.WriteLine($"  {assembly.Name}{maintainer}{deps}");
+                var maintainer = module.Maintainer != null ? $"  @{module.Maintainer}" : "";
+                Console.WriteLine($"  {module.Name}{maintainer}{deps}");
             }
             Console.WriteLine();
         }
 
-        // 显示依赖关系图（简化版）
         if (result.Edges.Count > 0)
         {
             WriteSection("依赖关系");
@@ -117,7 +113,6 @@ public class CliHandler(
 
     private int RunStack(string[] args)
     {
-        // agentic-os cli stack [projectRoot]
         var root = args.Length > 2 ? args[2] : null;
         var projectRoot = config.Resolve(root);
 
@@ -145,7 +140,7 @@ public class CliHandler(
             Console.WriteLine($"  {label}");
             Console.ResetColor();
 
-            Console.WriteLine($"    程序集:  {frame.AssemblyName}");
+            Console.WriteLine($"    模块:    {frame.ModuleName}");
             Console.WriteLine($"    任务:    {frame.TaskDescription}");
 
             Console.ForegroundColor = statusColor;
@@ -185,76 +180,73 @@ public class CliHandler(
 
     private int RunContext(string[] args)
     {
-        // agentic-os cli context [assemblyName] [projectRoot]
         if (args.Length < 3)
         {
-            WriteError("用法: agentic-os cli context [程序集名称] [projectRoot?]");
+            WriteError("用法: agentic-os cli context [模块名称] [projectRoot?]");
             return 1;
         }
 
-        var assemblyName = args[2];
+        var moduleName = args[2];
         var root = args.Length > 3 ? args[3] : null;
         var projectRoot = config.Resolve(root);
 
-        WriteHeader($"程序集上下文摘要 — {assemblyName}");
+        WriteHeader($"模块上下文摘要 — {moduleName}");
 
         var topology = dnaManager.ScanTopology(projectRoot);
-        var assembly = topology.Assemblies
-            .FirstOrDefault(a => a.Name.Equals(assemblyName, StringComparison.OrdinalIgnoreCase));
+        var module = topology.Modules
+            .FirstOrDefault(a => a.Name.Equals(moduleName, StringComparison.OrdinalIgnoreCase));
 
-        if (assembly == null)
+        if (module == null)
         {
-            WriteError($"程序集 '{assemblyName}' 未在拓扑图中找到。");
+            WriteError($"模块 '{moduleName}' 未在拓扑图中找到。");
             Console.WriteLine();
-            Console.WriteLine("已注册的程序集：");
-            foreach (var a in topology.Assemblies.OrderBy(x => x.Name))
+            Console.WriteLine("已注册的模块：");
+            foreach (var a in topology.Modules.OrderBy(x => x.Name))
                 Console.WriteLine($"  - {a.Name}");
             return 1;
         }
 
-        var boundaryIcon = assembly.Boundary switch
+        var boundaryIcon = module.Boundary switch
         {
             BoundaryMode.Shared => "◈ shared",
             BoundaryMode.Soft => "◇ soft",
             _ => "◆ hard"
         };
 
-        Console.WriteLine($"  路径:     {assembly.Path}");
+        Console.WriteLine($"  路径:     {module.Path}");
         Console.WriteLine($"  边界:     {boundaryIcon}");
-        if (assembly.Maintainer != null)
-            Console.WriteLine($"  维护者:   @{assembly.Maintainer}");
-        if (assembly.Dependencies.Count > 0)
-            Console.WriteLine($"  依赖:     {string.Join(", ", assembly.Dependencies)}");
+        if (module.Maintainer != null)
+            Console.WriteLine($"  维护者:   @{module.Maintainer}");
+        if (module.Dependencies.Count > 0)
+            Console.WriteLine($"  依赖:     {string.Join(", ", module.Dependencies)}");
 
         Console.WriteLine();
 
-        // 显示 .dna/ 文件摘要
         WriteSection(".dna/ 文件状态");
-        PrintDnaFileStatus("architecture.md", assembly.ArchitecturePath);
-        PrintDnaFileStatus("pitfalls.md", assembly.PitfallsPath);
-        PrintDnaFileStatus("dependencies.md", assembly.DependenciesPath);
-        PrintDnaFileStatus("changelog.md", assembly.ChangelogPath);
-        PrintDnaFileStatus("wip.md", assembly.WipPath);
+        PrintDnaFileStatus("architecture.md", module.ArchitecturePath);
+        PrintDnaFileStatus("pitfalls.md", module.PitfallsPath);
+        PrintDnaFileStatus("dependencies.md", module.DependenciesPath);
+        PrintDnaFileStatus("changelog.md", module.ChangelogPath);
+        PrintDnaFileStatus("wip.md", module.WipPath);
 
         return 0;
     }
 
     private int RunPlan(string[] args)
     {
-        // agentic-os cli plan [assembly1,assembly2,...] [projectRoot]
         if (args.Length < 3)
         {
-            WriteError("用法: agentic-os cli plan [程序集1,程序集2,...] [projectRoot?]");
+            WriteError("用法: agentic-os cli plan [模块1,模块2,...] [projectRoot?]");
             return 1;
         }
 
-        var assemblyNames = args[2].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        var moduleNames = args[2].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         var root = args.Length > 3 ? args[3] : null;
         var projectRoot = config.Resolve(root);
 
-        WriteHeader($"执行计划 — {string.Join(", ", assemblyNames)}");
+        WriteHeader($"执行计划 — {string.Join(", ", moduleNames)}");
 
-        var plan = dnaManager.GetExecutionPlan(assemblyNames, projectRoot);
+        var plan = dnaManager.GetExecutionPlan(moduleNames, projectRoot);
 
         if (plan.HasCycle)
         {
@@ -263,24 +255,23 @@ public class CliHandler(
             return 1;
         }
 
-        Console.WriteLine("  按以下顺序依次开发（被依赖方优先）：");
+        Console.WriteLine("  按以下顺序依次执行（被依赖方优先）：");
         Console.WriteLine();
-        for (int i = 0; i < plan.OrderedAssemblies.Count; i++)
+        for (int i = 0; i < plan.OrderedModules.Count; i++)
         {
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write($"  {i + 1}. ");
             Console.ResetColor();
-            Console.WriteLine(plan.OrderedAssemblies[i]);
+            Console.WriteLine(plan.OrderedModules[i]);
         }
         Console.WriteLine();
-        Console.WriteLine($"  执行顺序：{string.Join(" → ", plan.OrderedAssemblies)}");
+        Console.WriteLine($"  执行顺序：{string.Join(" → ", plan.OrderedModules)}");
 
         return 0;
     }
 
     private int RunValidate(string[] args)
     {
-        // agentic-os cli validate [caller] [callee] [projectRoot]
         if (args.Length < 4)
         {
             WriteError("用法: agentic-os cli validate [调用方] [被调用方] [projectRoot?]");
@@ -318,17 +309,16 @@ public class CliHandler(
 
     private async Task<int> RunDna(string[] args)
     {
-        // agentic-os cli dna [assemblyPath]
         if (args.Length < 3)
         {
-            WriteError("用法: agentic-os cli dna [程序集目录路径]");
+            WriteError("用法: agentic-os cli dna [模块目录路径]");
             return 1;
         }
 
-        var assemblyPath = args[2];
-        WriteHeader($"DNA 上下文 — {Path.GetFileName(assemblyPath)}");
+        var modulePath = args[2];
+        WriteHeader($"DNA 上下文 — {Path.GetFileName(modulePath)}");
 
-        var content = await workspace.ReadDnaAsync(assemblyPath);
+        var content = await workspace.ReadDnaAsync(modulePath);
         Console.WriteLine(content);
         return 0;
     }
@@ -337,7 +327,7 @@ public class CliHandler(
     {
         Console.WriteLine();
         Console.ForegroundColor = ConsoleColor.Cyan;
-        Console.WriteLine("  DNA-MCP CLI — Agentic OS 状态查询工具");
+        Console.WriteLine("  Agentic OS CLI — 工作区状态查询工具");
         Console.ResetColor();
         Console.WriteLine();
         Console.WriteLine("  用法: agentic-os cli <子命令> [参数...]");
@@ -346,12 +336,12 @@ public class CliHandler(
         WriteSection("子命令");
         var commands = new[]
         {
-            ("topology [root]",              "扫描并显示程序集 DAG 拓扑图"),
+            ("topology [root]",              "扫描并显示模块 DAG 拓扑图"),
             ("stack    [root]",              "查看当前调用栈（挂起任务状态）"),
-            ("context  <assembly> [root]",   "查看指定程序集的 DNA 上下文摘要"),
-            ("plan     <a1,a2,...> [root]",  "生成跨程序集执行计划（拓扑排序）"),
-            ("validate <caller> <callee> [root]", "校验程序集依赖关系"),
-            ("dna      <assemblyPath>",      "读取程序集完整 .dna/ 内容"),
+            ("context  <module> [root]",     "查看指定模块的 DNA 上下文摘要"),
+            ("plan     <m1,m2,...> [root]",  "生成跨模块执行计划（拓扑排序）"),
+            ("validate <caller> <callee> [root]", "校验模块依赖关系"),
+            ("dna      <modulePath>",        "读取模块完整 .dna/ 内容"),
             ("help",                         "显示此帮助"),
         };
 
@@ -373,8 +363,8 @@ public class CliHandler(
         Console.WriteLine("  agentic-os cli topology");
         Console.WriteLine("  agentic-os cli stack");
         Console.WriteLine("  agentic-os cli context Core");
-        Console.WriteLine("  agentic-os cli plan Core,Services/Audio,Services/Scene");
-        Console.WriteLine("  agentic-os cli validate Services/Audio Core");
+        Console.WriteLine("  agentic-os cli plan Core,Art/Characters,Design/Combat");
+        Console.WriteLine("  agentic-os cli validate Art/Characters Core");
         Console.WriteLine("  agentic-os cli dna C:\\MyProject\\src\\Core");
         Console.ResetColor();
         Console.WriteLine();
