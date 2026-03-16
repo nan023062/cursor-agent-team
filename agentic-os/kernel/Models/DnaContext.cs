@@ -1,0 +1,135 @@
+namespace AgenticOs.Models;
+
+/// <summary>
+/// 视界访问级别，对应上下文加载协议中的 Context Window Access Level
+/// </summary>
+public enum ContextLevel
+{
+    /// <summary>当前模块：.dna/ 全部 + 全部内容文件路径</summary>
+    Current,
+    /// <summary>共享层/软边界：.dna/ 全部 + Contract 相关文件路径</summary>
+    SharedOrSoft,
+    /// <summary>硬边界依赖：仅 identity.md 的 ## Contract 段</summary>
+    HardDependency,
+    /// <summary>非依赖模块：无权访问，物理隔离</summary>
+    Unlinked
+}
+
+/// <summary>
+/// 模块 DNA 上下文，由 get_module_context 工具按视界分级过滤后返回
+/// </summary>
+public class DnaContext
+{
+    /// <summary>模块名称</summary>
+    public string ModuleName { get; set; } = string.Empty;
+
+    /// <summary>访问级别</summary>
+    public ContextLevel Level { get; set; }
+
+    /// <summary>边界模式</summary>
+    public BoundaryMode Boundary { get; set; }
+
+    /// <summary>
+    /// identity.md 内容。
+    /// - Current/SharedOrSoft：完整内容
+    /// - HardDependency：仅 ## Contract 段
+    /// - Unlinked：null（拦截）
+    /// </summary>
+    public string? IdentityContent { get; set; }
+
+    /// <summary>
+    /// lessons.md 内容。
+    /// - Current/SharedOrSoft：完整内容
+    /// - HardDependency/Unlinked：null
+    /// </summary>
+    public string? LessonsContent { get; set; }
+
+    /// <summary>
+    /// links.md 内容。
+    /// - Current/SharedOrSoft：完整内容
+    /// - HardDependency/Unlinked：null
+    /// </summary>
+    public string? LinksContent { get; set; }
+
+    /// <summary>
+    /// active.md 内容（仅 Current 级别返回）
+    /// </summary>
+    public string? ActiveContent { get; set; }
+
+    /// <summary>
+    /// 内容文件路径列表（物理过滤后）。
+    /// - Current：全部内容文件路径
+    /// - SharedOrSoft：Contract 相关文件路径
+    /// - HardDependency/Unlinked：空列表
+    /// </summary>
+    public List<string> ContentFilePaths { get; set; } = [];
+
+    /// <summary>越界拦截消息（当 Level = Unlinked 时填充）</summary>
+    public string? BlockMessage { get; set; }
+
+    /// <summary>是否被拦截</summary>
+    public bool IsBlocked => Level == ContextLevel.Unlinked;
+}
+
+/// <summary>
+/// 拓扑图查询结果
+/// </summary>
+public class TopologyResult
+{
+    /// <summary>所有已注册的模块节点</summary>
+    public List<ModuleNode> Modules { get; set; } = [];
+
+    /// <summary>依赖边列表（from → to 表示 from 依赖 to）</summary>
+    public List<DependencyEdge> Edges { get; set; } = [];
+
+    /// <summary>项目根目录</summary>
+    public string ProjectRoot { get; set; } = string.Empty;
+
+    /// <summary>扫描时间</summary>
+    public DateTime ScannedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// 依赖边
+/// </summary>
+public class DependencyEdge
+{
+    /// <summary>依赖方（上层）</summary>
+    public string From { get; set; } = string.Empty;
+
+    /// <summary>被依赖方（下层）</summary>
+    public string To { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 执行计划结果（拓扑排序后的执行顺序）
+/// </summary>
+public class ExecutionPlan
+{
+    /// <summary>按执行顺序排列的模块名称列表（被依赖方优先）</summary>
+    public List<string> OrderedModules { get; set; } = [];
+
+    /// <summary>是否检测到循环依赖</summary>
+    public bool HasCycle { get; set; }
+
+    /// <summary>循环依赖描述（HasCycle 为 true 时填充）</summary>
+    public string? CycleDescription { get; set; }
+
+    /// <summary>各模块的变更类型说明</summary>
+    public Dictionary<string, string> ChangeTypes { get; set; } = [];
+}
+
+/// <summary>
+/// 依赖校验结果
+/// </summary>
+public class DependencyValidationResult
+{
+    /// <summary>是否合法</summary>
+    public bool IsValid { get; set; }
+
+    /// <summary>校验消息</summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>被拦截时的标准阻断消息</summary>
+    public string? BlockMessage { get; set; }
+}

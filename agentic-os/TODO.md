@@ -114,9 +114,9 @@
 **问题**：注册模块后只创建空 `.dna/` 目录，新用户不知道下一步做什么。
 
 **修复方向**：
-- 注册时自动生成模板文件：`architecture.md`、`pitfalls.md`、`dependencies.md`、`changelog.md`
+- 注册时自动生成模板文件：`identity.md`、`lessons.md`、`links.md`、`history.md`
 - 支持 `moduleType` 参数（`code` / `art` / `design` / `doc` / `generic`），不同类型生成不同模板
-- 代码类型的 architecture.md 预置 `## Public API` 段
+- 代码类型的 identity.md 预置 `## Contract` 段
 - 美术类型预置 `## 资产规范` 段
 - 策划类型预置 `## 交付契约` 段
 
@@ -132,11 +132,11 @@
 
 ### [ ] 8. 模块类型系统
 
-**问题**：设计上区分代码/美术/策划模块，但 `ModuleNode` 没有 `Type` 字段，靠正则猜测 architecture.md 段落标题。
+**问题**：设计上区分代码/美术/策划模块，但 `ModuleNode` 没有 `Type` 字段，靠正则猜测 identity.md 段落标题。
 
 **修复方向**：
 - `ModuleNode` 新增 `ModuleType` 属性
-- `architecture.md` 元数据中新增 `type: code|art|design|doc|generic`
+- `identity.md` 元数据中新增 `type: code|art|design|doc|generic`
 - 解析时读取 type 字段，回退到段落标题推断
 - 视界过滤可以按类型做差异化处理
 
@@ -162,15 +162,15 @@
 
 ---
 
-### [ ] 10. wip.md 与调用栈自动同步
+### [ ] 10. active.md 与调用栈自动同步
 
-**问题**：`wip.md` 和 `call-stack.json` 功能重叠但不同步，状态不一致会导致 AI 困惑。
+**问题**：`active.md` 和 `call-stack.json` 功能重叠但不同步，状态不一致会导致 AI 困惑。
 
 **修复方向**：
-- `suspend_and_push` 时自动将任务摘要写入对应模块的 `wip.md`
-- `complete_and_pop` 时自动清理对应模块的 `wip.md` 相关条目
-- 或者反过来：`wip.md` 作为只读视图，由调用栈自动生成
-- 明确两者的职责边界：调用栈 = 程序状态，wip.md = 人可读的工作备忘
+- `suspend_and_push` 时自动将任务摘要写入对应模块的 `active.md`
+- `complete_and_pop` 时自动清理对应模块的 `active.md` 相关条目
+- 或者反过来：`active.md` 作为只读视图，由调用栈自动生成
+- 明确两者的职责边界：调用栈 = 程序状态，active.md = 人可读的工作备忘
 
 **涉及文件**：
 - `Services/TaskSchedulerService.cs` — `SuspendAndPush`、`CompleteAndPop`
@@ -180,10 +180,10 @@
 
 ### [ ] 11. Pitfall 索引路径去硬编码
 
-**问题**：`WritePitfallAsync` 写死了 `coder/pitfall-index.md` 路径，通用项目不兼容。
+**问题**：`WritePitfallAsync` 写死了 pitfall 索引路径，通用项目不兼容。
 
 **修复方向**：
-- 索引路径改为 `.agentic-os/pitfall-index.md`
+- 索引路径改为 `.agentic-os/pitfall-index.md`（或项目根下的可配置路径）
 - 或通过配置文件 `.agentic-os/config.json` 自定义索引路径
 - 路径不存在时自动创建而非静默跳过
 
@@ -241,7 +241,7 @@
 | 7 | P1 | 待做 | register_module 自动生成 DNA 模板 |
 | 8 | P2 | 待做 | 模块类型系统 |
 | 9 | P2 | 待做 | 任务恢复条件自动检查 |
-| 10 | P2 | 待做 | wip.md 与调用栈自动同步 |
+| 10 | P2 | 待做 | active.md 与调用栈自动同步 |
 | 11 | P2 | 待做 | Pitfall 索引路径去硬编码 |
 | 12 | P3 | 待做 | AI 行为约束强制力 |
 | 13 | P3 | 待做 | 事件/通知机制 |

@@ -71,11 +71,11 @@ Agentic OS 不关心模块里装的是什么——它只关心模块有没有 `.
 
 > `.dna/` 不是模块的"内容"，而是模块的**身份编码**。
 
-- `architecture.md`（L3 永久规则）= 基因表达 = 岗位职责说明书
-- `pitfalls.md`（L1 原始经验）= 免疫记忆 = 错误案例手册
-- `dependencies.md` = 神经突触连接 = 协作部门清单
-- `changelog.md` = 生长记录 = 变更日志
-- `wip.md` = 当前活跃的信号 = 工作交接文档
+- `identity.md`（L3 永久规则）= 基因表达 = 岗位职责说明书（含 `## Issues` 已知问题段）
+- `lessons.md`（L1 原始经验）= 免疫记忆 = 错误案例手册
+- `links.md` = 神经突触连接 = 协作部门清单
+- `history.md` = 生长记录 = 变更日志
+- `active.md` = 当前活跃的信号 = 工作交接文档
 
 ### 规则跟着工作区走
 
@@ -98,15 +98,10 @@ Agentic OS：规则在模块的 .dna/ 里 → 换 AI 无所谓，规则还在
 |----------|----------|----------|------|
 | **Current** | 当前操作的模块 | 全部 `.dna/` + 全部内容文件 | 自己部门，完全权限 |
 | **SharedOrSoft** | Shared/Soft 边界邻居 | 全部 `.dna/` + 职责声明相关文件 | 兄弟部门，可看对方文档 |
-| **HardDependency** | Hard 边界依赖 | 仅 `architecture.md` 职责声明段 | 外部供应商，只看接口文档 |
+| **HardDependency** | Hard 边界依赖 | 仅 `identity.md` 的 `## Contract` 段 | 外部供应商，只看接口文档 |
 | **Unlinked** | 无依赖关系 | 物理拦截，什么都看不到 | 不相关的公司，无权访问 |
 
-**职责声明段**因模块类型而异，OS 自动识别：
-
-- 代码模块：`## Public API`
-- 策划模块：`## 交付契约`
-- 美术模块：`## 资产规范`
-- 自定义：`## 职责声明`
+**Contract 段**因模块类型而异，均使用 `## Contract` 标题（兼容旧的 `## Public API` / `## 交付契约` / `## 资产规范`）。
 
 类比人体的**血脑屏障**——不是所有信号都能进入大脑，硬边界模块的内部实现在 MCP 服务端就被物理屏蔽。
 
@@ -265,11 +260,11 @@ Claude Code 无缝续接。
 
 3. **都解决跨会话状态连续性**
    - Gateway：Session JSONL 记录 + Compaction + Memory Flush，Agent 可以回忆之前的对话
-   - Agentic OS：`call-stack.json` + `.dna/wip.md`，AI 重启后可以恢复任务进度
+   - Agentic OS：`call-stack.json` + `.dna/active.md`，AI 重启后可以恢复任务进度
 
 4. **都有"Agent 身份"概念**
    - Gateway：每个 Agent 有 `SOUL.md`、`IDENTITY.md`，决定了 Agent 是谁
-   - Agentic OS：每个模块有 `.dna/architecture.md`，决定了模块的职责和规则
+   - Agentic OS：每个模块有 `.dna/identity.md`，决定了模块的职责和规则
 
 5. **都强调与现有框架（LangChain/AutoGen/CrewAI）的差异**
    - 两者都明确把自己与"脚本式一次性调用"区分开来，强调有状态、可持续、有调度能力

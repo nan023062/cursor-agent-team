@@ -1,8 +1,8 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "agentic-os", "agentic-os\agentic-os.csproj", "{406DD7E6-75E1-4ACF-9BC3-8496DECA6607}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "kernel", "kernel\kernel.csproj", "{406DD7E6-75E1-4ACF-9BC3-8496DECA6607}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AgenticOs.UI", "AgenticOs.UI\AgenticOs.UI.csproj", "{EA80ABFE-FCE5-4A83-A1CB-54AFC2A1A856}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dashboard", "dashboard\dashboard.csproj", "{EA80ABFE-FCE5-4A83-A1CB-54AFC2A1A856}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

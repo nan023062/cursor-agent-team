@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agentic OS — 运行状态</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0f0f1a; color: #e2e8f0; min-height: 100vh; }
+    .toolbar { padding: 12px 16px; background: #1a1a2e; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .toolbar .path { color: #666; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    button { padding: 8px 14px; background: #4ade80; color: #0f0f1a; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    button:hover { background: #22c55e; }
+    .main { display: grid; grid-template-columns: 1fr 12px 1fr; gap: 0; padding: 12px; height: calc(100vh - 100px); }
+    .panel { background: #1a1a2e; border-radius: 6px; padding: 12px; overflow: auto; }
+    .panel h2 { margin: 0 0 12px; font-size: 16px; color: #fff; }
+    .panel .meta { color: #94a3b8; font-size: 12px; margin-bottom: 12px; }
+    .card { background: #16213e; border-radius: 4px; padding: 12px; margin-bottom: 8px; }
+    .card .header { color: #e94560; font-weight: bold; margin-bottom: 6px; }
+    .card .line { margin: 4px 0; }
+    .card .muted { color: #888; }
+    .status { padding: 8px 12px; background: #0f0f1a; color: #94a3b8; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span style="font-weight: 600;">项目根:</span>
+    <span id="projectRoot" class="path">（未设置）</span>
+    <button onclick="refresh()">加载 / 刷新</button>
+  </div>
+  <div class="main">
+    <div class="panel">
+      <h2>调用栈 (Call Stack)</h2>
+      <div id="stackMeta" class="meta"></div>
+      <div id="stackList"></div>
+    </div>
+    <div></div>
+    <div class="panel">
+      <h2>DNA 拓扑图</h2>
+      <div id="topologyMeta" class="meta"></div>
+      <div id="topologyList"></div>
+    </div>
+  </div>
+  <div id="status" class="status">就绪</div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const projectRootEl = document.getElementById('projectRoot');
+    const stackListEl = document.getElementById('stackList');
+    const stackMetaEl = document.getElementById('stackMeta');
+    const topologyListEl = document.getElementById('topologyList');
+    const topologyMetaEl = document.getElementById('topologyMeta');
+
+    function setStatus(msg) { statusEl.textContent = msg; }
+    function setError(msg) { statusEl.textContent = '错误: ' + msg; }
+
+    async function refresh() {
+      setStatus('加载中…');
+      try {
+        const [stackRes, topoRes] = await Promise.all([
+          fetch('/api/stack'),
+          fetch('/api/topology')
+        ]);
+
+        if (!stackRes.ok) {
+          const d = await stackRes.json().catch(() => ({}));
+          setError(d.error || stackRes.statusText);
+          return;
+        }
+        if (!topoRes.ok) {
+          const d = await topoRes.json().catch(() => ({}));
+          setError(d.error || topoRes.statusText);
+          return;
+        }
+
+        const stack = await stackRes.json();
+        const topo = await topoRes.json();
+
+        projectRootEl.textContent = stack.projectRoot || '—';
+        stackMetaEl.textContent = stack.updatedAt ? '更新时间: ' + new Date(stack.updatedAt).toLocaleString() : '';
+        stackListEl.innerHTML = (stack.frames || []).map(f => `
+          <div class="card">
+            <div class="header">${f.header || (f.isTop ? '▶ 栈顶（当前执行）' : '○ 已挂起')}</div>
+            <div class="line"><span class="muted">模块: </span>${f.moduleName}</div>
+            <div class="line">${f.taskDescription}</div>
+            <div class="line"><span class="muted">状态: </span>${f.statusText}</div>
+            ${f.suspendReason ? '<div class="line" style="color:#fbbf24">' + f.suspendReason + '</div>' : ''}
+            ${f.subTasksSummary ? '<div class="line" style="color:#94a3b8">' + f.subTasksSummary + '</div>' : ''}
+          </div>
+        `).join('') || '<p style="color:#666">暂无调用栈</p>';
+
+        topologyMetaEl.textContent = topo.summary || '';
+        topologyListEl.innerHTML = (topo.modules || []).map(m => `
+          <div class="card">
+            <div class="line" style="font-weight: 600;">${m.name}</div>
+            <div class="line"><span class="muted">边界: </span><span style="color:#a78bfa">${m.boundary}</span>
+              <span class="muted"> 依赖: </span><span style="color:#94a3b8">${m.dependencies}</span></div>
+            ${m.maintainer ? '<div class="line" style="color:#64748b;font-size:12px">' + m.maintainer + '</div>' : ''}
+          </div>
+        `).join('') || '<p style="color:#666">暂无模块</p>';
+
+        setStatus('已刷新 · ' + new Date().toLocaleTimeString());
+      } catch (e) {
+        setError(e.message);
+      }
+    }
+
+    refresh();
+  </script>
+</body>
+</html>
